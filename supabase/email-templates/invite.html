@@ -1,0 +1,11 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1d2127">
+  <h2 style="margin:0 0 12px;color:#1f6bff">You have been invited</h2>
+  <p style="line-height:1.5">An admin created an account for you on the Attendance Registration System. Accept the invitation and choose your own password.</p>
+  <p style="margin:24px 0">
+    <a href="{{ .SiteURL }}/#/auth/confirm?token_hash={{ .TokenHash }}&type=invite"
+       style="background:#1f6bff;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:bold;display:inline-block">Accept invitation</a>
+  </p>
+  <p style="font-size:13px;color:#6b6558;line-height:1.5">If the button does not work, copy this address into your browser:<br>
+    {{ .SiteURL }}/#/auth/confirm?token_hash={{ .TokenHash }}&type=invite</p>
+  <p style="font-size:13px;color:#6b6558">If you did not expect this email, you can ignore it.</p>
+</div>
