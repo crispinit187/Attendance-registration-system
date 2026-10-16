@@ -73,6 +73,9 @@ export const api = {
   events: () => must<EventRow[]>(supabase.from('events').select('*').order('created_at', { ascending: false })),
   lists: () => must<ListRow[]>(supabase.from('lists').select('*').order('created_at', { ascending: false })),
   createEvent: (name: string) => rpc<string>('create_event', { p_name: name }),
+  archiveEvent: (id: string) => rpc('archive_event', { p_id: id }),
+  unarchiveEvent: (id: string) => rpc('unarchive_event', { p_id: id }),
+  deleteEvent: (id: string, confirm: string) => rpc('delete_event', { p_id: id, p_confirm: confirm }),
   renameEvent: (id: string, name: string) => rpc('rename_event', { p_id: id, p_name: name }),
   saveList: (v: {
     id: string | null; event: string; title: string; allowed: string[]; location: boolean;
@@ -141,6 +144,7 @@ export const api = {
   signupUpdate: (id: string, p: ProfileInput, force: boolean) =>
     rpc<{ status: 'saved' | 'similar' | 'already'; matches?: SignupMatch[] }>('signup_update_entry', { p_id: id, ...profileArgs(p), p_force: force }),
   signupRemove: (id: string, reason: string) => rpc('signup_remove_entry', { p_id: id, p_reason: reason }),
+  signupDeleteEntry: (id: string) => rpc('signup_delete_entry', { p_id: id }),
   signupRestore: (id: string) => rpc('signup_restore_entry', { p_id: id }),
   signupToPerson: (id: string, force: boolean) =>
     rpc<{ status: 'similar'; matches: PersonCard[] } | { status: 'created'; id: string }>('signup_to_person', { p_entry: id, p_force: force }),

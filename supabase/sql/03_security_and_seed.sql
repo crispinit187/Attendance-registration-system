@@ -48,7 +48,8 @@ begin
          'signup_public_info', 'signup_submit', 'signup_lists_overview', 'signup_get',
          'signup_save', 'signup_set_open', 'signup_new_link', 'signup_delete',
          'signup_entries', 'signup_paste', 'signup_update_entry', 'signup_remove_entry',
-         'signup_restore_entry', 'signup_to_person', 'signup_merge_into'])
+         'signup_restore_entry', 'signup_to_person', 'signup_merge_into',
+         'delete_event', 'archive_event', 'unarchive_event', 'signup_delete_entry'])
   loop
     execute format('grant execute on function %s to authenticated', f.sig);
   end loop;
@@ -145,3 +146,11 @@ insert into public.titles (name, needs_specify, sort) values
 insert into public.voice_parts (name, sort) values
   ('Soprano I', 1), ('Soprano II', 2), ('Alto I', 3), ('Alto II', 4),
   ('Tenor I', 5), ('Tenor II', 6), ('Bass I', 7), ('Bass II', 8);
+
+-- The server-side invite function uses the service_role. When "Automatically expose
+-- new tables" is OFF in Supabase, service_role gets no table access by default, so
+-- grant it explicitly. (service_role never reaches the browser.)
+grant usage on schema public to service_role;
+grant all on all tables    in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;

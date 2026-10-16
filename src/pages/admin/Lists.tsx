@@ -18,6 +18,7 @@ export function Lists() {
   const [showArchived, setShowArchived] = useState(false);
   const [newEvent, setNewEvent] = useState(false);
   const [rename, setRename] = useState<EventRow | null>(null);
+  const [evAct, setEvAct] = useState<{ kind: 'archive' | 'delete'; event: EventRow; lists?: number } | null>(null);   // event being archived / deleted
   const [form, setForm] = useState<{ event: EventRow; list: ListRow | null } | null>(null);
   const [act, setAct] = useState<{ kind: 'open' | 'close' | 'archive' | 'delete'; list: ListRow } | null>(null);
 
@@ -51,15 +52,23 @@ export function Lists() {
       {openList && <Alert kind="info">Registration is open for <b>{openList.title}</b>. Only one list can be open at a time.</Alert>}
       {!events.data?.length && <div className="card hero muted">No events yet. Create an event (for example “Annual Conference 2026”), then add lists to it.</div>}
 
-      {events.data?.map((ev) => {
+      {events.data?.filter((ev) => showArchived || !ev.archived_at).map((ev) => {
         const ls = byEvent.get(ev.id) ?? [];
+        const allLists = (lists.data ?? []).filter((l) => l.event_id === ev.id);
         return (
           <div className="card stack" key={ev.id}>
             <div className="row between">
-              <h2 style={{ margin: 0 }}>{ev.name}</h2>
+              <h2 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge>archived</Badge>}</h2>
               <div className="row">
                 <button className="btn small ghost" onClick={() => setRename(ev)}>Rename</button>
-                <button className="btn small" onClick={() => setForm({ event: ev, list: null })}><Icon name="plus" size={14} />Add list</button>
+                {!ev.archived_at && <button className="btn small" onClick={() => setForm({ event: ev, list: null })}><Icon name="plus" size={14} />Add list</button>}
+                {!ev.archived_at && <button className="btn small" onClick={() => setEvAct({ kind: 'archive', event: ev })}>Archive</button>}
+                {ev.archived_at && (
+                  <>
+                    <button className="btn small" onClick={async () => { try { await api.unarchiveEvent(ev.id); toast('Event restored from the archive.'); reload(); } catch (e) { toast(errMsg(e)); } }}>Restore</button>
+                    <button className="btn small danger" onClick={() => setEvAct({ kind: 'delete', event: ev, lists: allLists.length })}>Delete…</button>
+                  </>
+                )}
               </div>
             </div>
             {ls.length === 0 && <p className="muted small" style={{ margin: 0 }}>No lists in this event yet.</p>}
@@ -119,6 +128,23 @@ export function Lists() {
         <ConfirmDialog title="Delete this list for good?" danger confirmLabel="Delete forever" typeToConfirm={act.list.title}
           body={<><p><b>This cannot be undone.</b> The list and every attendance record in it will be permanently deleted. The deletion is written to the audit log.</p></>}
           onClose={() => setAct(null)} onConfirm={async () => { await api.deleteList(act.list.id, act.list.title); toast('List deleted.'); reload(); }} />
+      )}
+      {evAct?.kind === 'archive' && (
+        <ConfirmDialog title={`Archive “${evAct.event.name}”?`} confirmLabel="Archive event"
+          body={<p>The event is hidden from this page (tick “Show archived” to see it). Nothing is deleted, and you can restore it any time. An event with an open list cannot be archived.</p>}
+          onClose={() => setEvAct(null)} onConfirm={async () => { await api.archiveEvent(evAct.event.id); toast('Event archived.'); reload(); }} />
+      )}
+      {evAct?.kind === 'delete' && (
+        <ConfirmDialog title="Delete this event and everything in it?" danger confirmLabel="Delete everything" typeToConfirm={evAct.event.name}
+          body={<>
+            <Alert>
+              <b>Warning: this cannot be undone.</b> Deleting “{evAct.event.name}” permanently deletes
+              {' '}{evAct.lists ? <>its <b>{evAct.lists} list{evAct.lists === 1 ? '' : 's'}</b> and <b>every attendance record</b> in {evAct.lists === 1 ? 'it' : 'them'}</> : 'the event'},
+              {' '}and any reviewer access given for it. Exports you already downloaded are not affected.
+            </Alert>
+            <p>The deletion is written to the audit log (with how many lists and records were removed). If you may need the data, export it first.</p>
+          </>}
+          onClose={() => setEvAct(null)} onConfirm={async () => { await api.deleteEvent(evAct.event.id, evAct.event.name); toast('Event deleted.'); reload(); }} />
       )}
     </div>
   );

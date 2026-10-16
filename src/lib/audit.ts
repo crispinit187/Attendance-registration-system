@@ -25,6 +25,10 @@ export function describeAudit(r: AuditRow): { what: string; why: string } {
     case 'signup.restore_entry': return { what: `restored ${s(d.person)} on the sign-ups of ${s(d.title)}`, why: '' };
     case 'signup.convert': return { what: `added ${s(d.person)} to people from the sign-ups of ${s(d.list)}`, why: '' };
     case 'signup.merge': return { what: `attached the sign-up of ${s(d.entry)} to ${s(d.person)}`, why: `From ${s(d.list)}` };
+    case 'event.archive': return { what: `archived the event ${s(d.name)}`, why: '' };
+    case 'event.unarchive': return { what: `restored the event ${s(d.name)} from the archive`, why: '' };
+    case 'event.delete': return { what: `deleted the event ${s(d.name)}`, why: `${s(d.lists)} list(s) and ${s(d.attendance_records)} attendance records were deleted with it` };
+    case 'signup.delete_entry': return { what: `permanently deleted a removed entry from the sign-ups of ${s(d.title)}`, why: 'Details of the person are not kept' };
     case 'event.create': return { what: `created the event ${s(d.name)}`, why: '' };
     case 'export': return { what: `exported ${s(d.name)} (${s(d.format).toUpperCase()})`, why: d.contact ? 'Contact numbers included' : 'Contact numbers left out' };
     case 'account.create': return { what: `created a ${s(d.role)} account for ${s(d.email)}`, why: '' };

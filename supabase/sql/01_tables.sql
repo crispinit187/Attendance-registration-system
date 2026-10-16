@@ -91,7 +91,8 @@ create table public.events (
   id         uuid primary key default gen_random_uuid(),
   name       text not null check (char_length(btrim(name)) >= 2),
   created_by uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  archived_at timestamptz                      -- set when the event is archived (hidden, restorable)
 );
 
 create table public.lists (

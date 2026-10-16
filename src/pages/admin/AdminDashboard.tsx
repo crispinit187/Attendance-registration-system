@@ -23,7 +23,7 @@ export function AdminDashboard() {
   const qc = useQueryClient();
   const toast = useToast();
   const { areas } = useLookups();
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, select: (d) => d.filter((e) => !e.archived_at) });   // archived events are hidden here
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
   const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople });
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts });

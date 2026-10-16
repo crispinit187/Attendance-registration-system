@@ -10,7 +10,7 @@ export interface Person {
   area_id: string | null; district_group_id: string | null; voice_part_id: string | null;
   contact: string | null; archived: boolean; created_at: string; merged_into: string | null;
 }
-export interface EventRow { id: string; name: string; created_at: string }
+export interface EventRow { id: string; name: string; created_at: string; archived_at: string | null }
 export interface ListRow {
   id: string; event_id: string; title: string; status: 'draft' | 'open' | 'closed' | 'archived';
   allowed_area_ids: string[]; location_check: boolean; venue_lat: number | null; venue_lng: number | null;

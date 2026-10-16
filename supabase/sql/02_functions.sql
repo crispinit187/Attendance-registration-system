@@ -753,6 +753,9 @@ begin
   end if;
   if p_id is null then
     if not exists (select 1 from public.events where id = p_event) then raise exception 'Event not found.'; end if;
+    if exists (select 1 from public.events where id = p_event and archived_at is not null) then
+      raise exception 'This event is archived. Restore it before adding lists.';
+    end if;
     insert into public.lists (event_id, title, allowed_area_ids, location_check, venue_lat, venue_lng,
                               radius_m, rotating_qr, rotation_seconds, created_by)
     values (p_event, btrim(p_title), allowed, p_location, p_lat, p_lng,
@@ -782,6 +785,9 @@ begin
   if not found then raise exception 'List not found.'; end if;
   if l.status = 'open' then return; end if;
   if l.status = 'archived' then raise exception 'Restore this list from the archive before opening it.'; end if;
+  if exists (select 1 from public.events where id = l.event_id and archived_at is not null) then
+    raise exception 'This list belongs to an archived event. Restore the event first.';
+  end if;
   select * into o from public.lists where status = 'open';
   if found then
     raise exception 'The list "%" is already open. Close it before opening another list.', o.title;
@@ -1707,4 +1713,75 @@ begin
   update public.signup_entries set person_id = p.id, linked_at = now() where id = e.id;
   perform public.log_action('signup.merge', 'person', p.id::text,
     jsonb_build_object('list', l.title, 'entry', e.full_name, 'person', p.full_name));
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Delete an EMPTY event, and permanently delete a sign-up entry that was already removed
+-- ---------------------------------------------------------------------------
+-- Archive an event: hides it (and keeps everything). Not allowed while one of its lists is open.
+create or replace function public.archive_event(p_id uuid) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare ev public.events%rowtype;
+begin
+  perform public.need_role(array['admin']);
+  select * into ev from public.events where id = p_id for update;
+  if not found then raise exception 'Event not found.'; end if;
+  if ev.archived_at is not null then return; end if;
+  if exists (select 1 from public.lists where event_id = p_id and status = 'open') then
+    raise exception 'A list in this event is open. Close it before archiving the event.';
+  end if;
+  update public.events set archived_at = now() where id = p_id;
+  perform public.log_action('event.archive', 'event', p_id::text, jsonb_build_object('name', ev.name));
+end $$;
+
+create or replace function public.unarchive_event(p_id uuid) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare ev public.events%rowtype;
+begin
+  perform public.need_role(array['admin']);
+  select * into ev from public.events where id = p_id for update;
+  if not found then raise exception 'Event not found.'; end if;
+  if ev.archived_at is null then return; end if;
+  update public.events set archived_at = null where id = p_id;
+  perform public.log_action('event.unarchive', 'event', p_id::text, jsonb_build_object('name', ev.name));
+end $$;
+
+-- Permanent. Admin only, only for an ARCHIVED event, and only when its exact name is typed.
+-- It deletes everything inside: the event's lists, all their attendance records and any
+-- reviewer access given for the event or its lists. The audit log keeps the counts.
+create or replace function public.delete_event(p_id uuid, p_confirm text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare ev public.events%rowtype; nl int; na int;
+begin
+  perform public.need_role(array['admin']);
+  select * into ev from public.events where id = p_id for update;
+  if not found then raise exception 'Event not found.'; end if;
+  if ev.archived_at is null then raise exception 'Archive this event before deleting it.'; end if;
+  if exists (select 1 from public.lists where event_id = p_id and status = 'open') then
+    raise exception 'A list in this event is open. Close it first.';
+  end if;
+  if btrim(coalesce(p_confirm, '')) <> ev.name then
+    raise exception 'The typed name does not match. Nothing was deleted.';
+  end if;
+  select count(*) into nl from public.lists where event_id = p_id;
+  select count(*) into na from public.attendance a join public.lists l on l.id = a.list_id where l.event_id = p_id;
+  delete from public.events where id = p_id;      -- lists, attendance and grants go with it
+  perform public.log_action('event.delete', 'event', p_id::text,
+    jsonb_build_object('name', ev.name, 'lists', nl, 'attendance_records', na));
+end $$;
+
+-- Admin only, and only for an entry that was removed first. The audit log records that an
+-- entry was deleted from which list, but not the person's name or details.
+create or replace function public.signup_delete_entry(p_id uuid) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare e public.signup_entries%rowtype; l public.signup_lists%rowtype;
+begin
+  perform public.need_role(array['admin']);
+  perform public.rate_check('signup_remove', 60, 60);
+  select * into e from public.signup_entries where id = p_id for update;
+  if not found then raise exception 'Entry not found.'; end if;
+  if not e.removed then raise exception 'Remove this entry first, then delete it permanently.'; end if;
+  select * into l from public.signup_lists where id = e.list_id;
+  delete from public.signup_entries where id = e.id;
+  perform public.log_action('signup.delete_entry', 'signup', l.id::text, jsonb_build_object('title', l.title));
 end $$;

@@ -86,6 +86,7 @@ function EntriesTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: boolea
   const [fv, setFv] = useState('');
   const [editing, setEditing] = useState<SignupEntry | null>(null);
   const [removing, setRemoving] = useState<SignupEntry | null>(null);
+  const [purging, setPurging] = useState<SignupEntry | null>(null);   // a removed entry the admin is deleting for good
   const [merging, setMerging] = useState<SignupEntry | null>(null);
   const [similar, setSimilar] = useState<{ entry: SignupEntry; matches: PersonCard[] } | null>(null);
   const [invite, setInvite] = useState<{ entry: SignupEntry; personId: string } | null>(null);
@@ -150,6 +151,7 @@ function EntriesTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: boolea
                         {!r.removed && isAdmin && !r.person_id && <button className="btn small ghost" onClick={() => setMerging(r)}>Merge…</button>}
                         {!r.removed && r.can_edit && <button className="btn small danger" onClick={() => setRemoving(r)}>Remove</button>}
                         {r.removed && isAdmin && <button className="btn small" onClick={async () => { try { await api.signupRestore(r.id); toast('Restored.'); reload(); } catch (x) { toast(errMsg(x)); } }}>Restore</button>}
+                        {r.removed && isAdmin && <button className="btn small danger" onClick={() => setPurging(r)}>Delete forever…</button>}
                       </div>
                     </td>
                   </tr>
@@ -171,6 +173,12 @@ function EntriesTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: boolea
           body={<p>They stop counting on this sign-up list. The removal and your reason are saved in the audit log{isAdmin ? ', and you can restore them later' : ''}.</p>}
           onClose={() => setRemoving(null)}
           onConfirm={async (reason) => { await api.signupRemove(removing.id, reason); toast('Removed.'); reload(); }} />
+      )}
+      {purging && (
+        <ConfirmDialog title={`Delete ${purging.display_name} forever?`} danger confirmLabel="Delete forever"
+          body={<p><b>This cannot be undone.</b> The entry is erased completely. The audit log notes that an entry was deleted from this list, but not who it was.</p>}
+          onClose={() => setPurging(null)}
+          onConfirm={async () => { await api.signupDeleteEntry(purging.id); toast('Entry deleted.'); reload(); }} />
       )}
       {merging && <MergeDialog entry={merging} onClose={() => setMerging(null)} onDone={() => { setMerging(null); reload(); toast('Attached.'); }} />}
       {similar && (

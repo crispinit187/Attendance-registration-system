@@ -179,7 +179,7 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
             <button className="btn small danger" onClick={() => setRevoking(g.id)}>Remove</button></div>
         ))}
         <Field label="Give access to a whole event (all its lists, now and later)">
-          <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
+          <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
             <button className="btn" disabled={!ev} onClick={() => add(ev, null)}>Add</button></div>
         </Field>
         <Field label="Or to one list only">
