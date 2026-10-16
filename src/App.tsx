@@ -6,6 +6,7 @@ import type { Role } from './lib/types';
 import { Alert, Loading } from './components/ui';
 import { Shell } from './components/Shell';
 import { SignOutButton } from './components/SignOut';
+import { BrandFooter } from './components/BrandFooter';
 import { Login } from './pages/auth/Login';
 import { Confirm } from './pages/auth/Confirm';
 import { SetPassword } from './pages/auth/SetPassword';
@@ -87,8 +88,9 @@ function SetupNeeded() {
 }
 
 export default function App() {
-  if (!configured) return <SetupNeeded />;
+  if (!configured) return <><SetupNeeded /><BrandFooter /></>;
   return (
+    <>
     <HashRouter>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
@@ -129,5 +131,7 @@ export default function App() {
         <Route path="*" element={<Guard><Home /></Guard>} />
       </Routes>
     </HashRouter>
+    <BrandFooter />
+    </>
   );
 }
