@@ -42,15 +42,15 @@ export function MarkFlow({ listId, token }: { listId: string; token: string }) {
     started.current = true;
     (async () => {
       try {
-        const open = await api.openList();
-        if (!open || open.id !== listId) throw new Error('Registration is closed, or this QR code is for a different list.');
+        const open = (await api.openLists()).find((l) => l.id === listId);
+        if (!open) throw new Error('Registration is closed, or this QR code is for a different list.');
         const pos = open.location_check ? await getPosition() : undefined;
         const r = await api.markMine(listId, token, pos);
         setTitle(r.list_title);
         setAttId(r.attendance_id);
         setMarkedAt(Date.now());
         setState(r.status === 'already' ? 'already' : 'ok');
-        void qc.invalidateQueries({ queryKey: ['open-list'] });
+        void qc.invalidateQueries({ queryKey: ['open-lists'] });
         void qc.invalidateQueries({ queryKey: ['my-history'] });
       } catch (e) { setMsg(errMsg(e)); setState('err'); }
     })();
@@ -72,7 +72,7 @@ export function MarkFlow({ listId, token }: { listId: string; token: string }) {
       <div className="row" style={{ justifyContent: 'center' }}>
         {canUndo && (
           <button className="btn danger" onClick={async () => {
-            try { await api.undo(attId); setUndone(true); toast('Attendance removed.'); void qc.invalidateQueries({ queryKey: ['open-list'] }); }
+            try { await api.undo(attId); setUndone(true); toast('Attendance removed.'); void qc.invalidateQueries({ queryKey: ['open-lists'] }); }
             catch (e) { toast(errMsg(e)); }
           }}>That was a mistake: undo</button>
         )}

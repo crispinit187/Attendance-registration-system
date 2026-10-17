@@ -27,18 +27,21 @@ export function AdminDashboard() {
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
-  const open = useQuery({ queryKey: ['open-list'], queryFn: api.openList, refetchInterval: 10_000 });
+  const opens = useQuery({ queryKey: ['open-lists'], queryFn: api.openLists, refetchInterval: 10_000 });
   const audit = useQuery({ queryKey: ['audit', 6], queryFn: () => api.audit(6) });
   const [eventId, setEventId] = useState('');
   const [closing, setClosing] = useState<ListRow | null>(null);
   const [opening, setOpening] = useState<ListRow | null>(null);
   const [archiving, setArchiving] = useState<ListRow | null>(null);
 
-  const openRow = lists.data?.find((l) => l.status === 'open');
+  // Several lists can be open. The big card shows the one in the chosen event (or the newest open one).
+  const openRows = (lists.data ?? []).filter((l) => l.status === 'open');
+  const openRow = openRows.find((l) => l.event_id === eventId) ?? openRows[0];
+  const openCount = opens.data?.find((o) => o.id === openRow?.id)?.present_count ?? 0;
   useEffect(() => {
     if (!eventId && events.data?.length) setEventId(openRow?.event_id ?? events.data[0]!.id);
   }, [events.data, openRow, eventId]);
-  useLiveAttendance([['open-list'], ['breakdown', eventId]]);
+  useLiveAttendance([['open-lists'], ['breakdown', eventId]]);
   const bd = useQuery({ queryKey: ['breakdown', eventId], enabled: !!eventId, queryFn: () => api.breakdown(eventId), refetchInterval: 20_000 });
 
   const ev = events.data?.find((e) => e.id === eventId);
@@ -51,7 +54,7 @@ export function AdminDashboard() {
   const maxBar = Math.max(1, ...evLists.map((l) => total(l.id)));
   const withAcc = (accounts.data ?? []).filter((a) => a.person_id).length;
   const peopleCount = (people.data ?? []).filter((p) => !p.archived).length;
-  const reload = () => { void qc.invalidateQueries({ queryKey: ['lists'] }); void qc.invalidateQueries({ queryKey: ['open-list'] }); void qc.invalidateQueries({ queryKey: ['audit'] }); };
+  const reload = () => { void qc.invalidateQueries({ queryKey: ['lists'] }); void qc.invalidateQueries({ queryKey: ['open-lists'] }); void qc.invalidateQueries({ queryKey: ['audit'] }); };
 
   if (events.isLoading || lists.isLoading) return <div className="page wide"><Loading /></div>;
   const err = events.error ?? lists.error ?? people.error ?? accounts.error;
@@ -80,7 +83,7 @@ export function AdminDashboard() {
       {openRow && (
         <section className="card live row between" style={{ padding: 22, gap: 18 }} aria-label="Open list">
           <div className="stack" style={{ gap: 8, minWidth: 240 }}>
-            <div className="openTag">Open now - live</div>
+            <div className="openTag">Open now - live{openRows.length > 1 ? ` · ${openRows.length} lists are open` : ''}</div>
             <div style={{ fontFamily: 'var(--serif)', fontSize: 26, fontWeight: 600 }}>{openRow.title}</div>
             <div className="row" style={{ gap: 8 }}>
               {openRow.location_check && <span className="pill">Location check: {openRow.radius_m} m</span>}
@@ -89,7 +92,7 @@ export function AdminDashboard() {
             </div>
           </div>
           <div style={{ textAlign: 'center', padding: '0 12px' }}>
-            <div className="bigcount">{open.data?.present_count ?? 0}</div>
+            <div className="bigcount">{openCount}</div>
             <div className="muted" style={{ fontSize: 13 }}>present</div>
           </div>
           <div className="row" style={{ gap: 10 }}>
@@ -102,7 +105,7 @@ export function AdminDashboard() {
       )}
 
       <section className="grid c3" aria-label="Key figures">
-        <div className="statcard"><div className="l">Present on open list</div><div className="v">{openRow ? open.data?.present_count ?? 0 : '–'}</div><div className="n">{openRow ? 'Updating live' : 'No list is open'}</div></div>
+        <div className="statcard"><div className="l">Present on open list</div><div className="v">{openRow ? openCount : '–'}</div><div className="n">{openRow ? 'Updating live' : 'No list is open'}</div></div>
         <div className="statcard"><div className="l">People on record</div><div className="v">{peopleCount}</div><div className="n">Members and registrar entries</div></div>
         <div className="statcard"><div className="l">With accounts</div><div className="v">{withAcc}</div><div className="n">{Math.max(0, peopleCount - withAcc)} without a device yet</div></div>
         <div className="statcard"><div className="l">Lists in this event</div><div className="v">{evLists.length}</div><div className="n">{held} held, {evLists.length - held} to come</div></div>
@@ -142,11 +145,10 @@ export function AdminDashboard() {
       <section className="card stack" style={{ gap: 4 }} aria-label="Lists">
         <div className="row between" style={{ alignItems: 'baseline', marginBottom: 8 }}>
           <h2 style={{ ...H2, margin: 0 }}>Lists in this event</h2>
-          {openRow && <span className="muted" style={{ fontSize: 13 }}>Only one list can be open at a time. Close {openRow.title} before opening another.</span>}
         </div>
         {evLists.map((l) => {
           const n = total(l.id);
-          const canOpen = (l.status === 'draft' || l.status === 'closed') && !openRow;
+          const canOpen = l.status === 'draft' || l.status === 'closed';
           return (
             <div className="row between" key={l.id} style={{ padding: '12px 0', borderTop: '1px solid var(--border)', gap: 10 }}>
               <div className="row" style={{ gap: 12, minWidth: 180 }}>

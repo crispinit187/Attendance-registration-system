@@ -19,7 +19,7 @@ In Supabase open **SQL Editor → New query**. Paste the whole contents of each 
 2. `supabase/sql/02_functions.sql`
 3. `supabase/sql/03_security_and_seed.sql`
 
-Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`, `10_realtime.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
+Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`, `10_realtime.sql`, `11_access_scope.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
 
 ## 3. Login settings (Authentication)
 - **URL Configuration**: Site URL = your final website address **without a trailing slash**, e.g. `https://YOURNAME.github.io/attendance-registration`. Add the same address (and `http://localhost:5173` for local testing) to **Redirect URLs**.
@@ -85,3 +85,12 @@ npm run dev
 - Roles live in the `accounts` table, not in anything a user can edit.
 - Sign-in, sign-up and password reset are protected by the Turnstile check and Supabase rate limits; marking attendance and searching are rate limited inside the database.
 - Supabase free projects pause after about a week of no activity; opening the site (or the dashboard) wakes them.
+
+## Access types and open lists
+
+Registrars and reviewers each have an access type, set by the admin on the Accounts page (the three dots on a row, then Access):
+
+- **All events and lists**: everything, including future ones (and every sign-up list for registrars).
+- **Only what I select**: just the events, lists and, for registrars, sign-up lists the admin adds. Access can be added or removed at any time.
+
+Several attendance lists and several sign-up lists can be open at the same time. If you run an older database, run `11_access_scope.sql` once and redeploy the function: `npx supabase functions deploy admin-create-user`.

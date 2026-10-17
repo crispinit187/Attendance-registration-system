@@ -80,6 +80,7 @@ create table public.accounts (
   person_id         uuid unique references public.people(id) on delete set null,
   must_set_password boolean not null default false,
   disabled          boolean not null default false,
+  access_scope      text not null default 'all' check (access_scope in ('all', 'selected')),   -- registrars and reviewers: every event and list, or only those granted
   created_by        uuid,
   created_at        timestamptz not null default now()
 );
@@ -117,9 +118,7 @@ create table public.lists (
 );
 create index lists_event on public.lists (event_id);
 
--- THE ONE-OPEN-LIST RULE, enforced by the database itself:
--- at most one row in the whole table can have status = 'open'.
-create unique index one_open_list on public.lists ((status)) where status = 'open';
+-- Several lists (and several sign-up lists) can be open at the same time.
 
 create table public.list_secrets (
   list_id         uuid primary key references public.lists(id) on delete cascade,
@@ -157,9 +156,10 @@ create table public.reviewer_grants (
   account_id uuid not null references public.accounts(id) on delete cascade,
   event_id   uuid references public.events(id) on delete cascade,
   list_id    uuid references public.lists(id) on delete cascade,
+  signup_list_id uuid,   -- registrars only; references signup_lists (added below, once that table exists)
   created_by uuid,
   created_at timestamptz not null default now(),
-  check ((event_id is null) <> (list_id is null))
+  check ((event_id is not null)::int + (list_id is not null)::int + (signup_list_id is not null)::int = 1)
 );
 create unique index reviewer_grants_event_key on public.reviewer_grants (account_id, event_id) where event_id is not null;
 create unique index reviewer_grants_list_key  on public.reviewer_grants (account_id, list_id)  where list_id  is not null;
@@ -226,8 +226,12 @@ create table public.signup_lists (
   created_at       timestamptz not null default now(),
   check (not location_check or (venue_lat is not null and venue_lng is not null))
 );
+
+-- Registrar access to a sign-up list (the column on reviewer_grants is added before this table exists)
+alter table public.reviewer_grants
+  add constraint reviewer_grants_signup_fk foreign key (signup_list_id) references public.signup_lists(id) on delete cascade;
+create unique index reviewer_grants_signup_key on public.reviewer_grants (account_id, signup_list_id) where signup_list_id is not null;
 -- Only one sign-up list can be open at a time (separate from attendance lists)
-create unique index one_open_signup on public.signup_lists ((status)) where status = 'open';
 
 create table public.signup_entries (
   id                uuid primary key default gen_random_uuid(),

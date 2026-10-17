@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
     // 5. Set role (stored in the accounts table, never in user-editable metadata)
     const { error: aerr } = await admin.from('accounts').update({
-      role, full_name: fullName, must_set_password: true, person_id: personId, created_by: u.user.id,
+      role, full_name: fullName, access_scope: body.scope === 'selected' ? 'selected' : 'all', must_set_password: true, person_id: personId, created_by: u.user.id,
     }).eq('id', inv.user.id);
     if (aerr) {
       await admin.auth.admin.deleteUser(inv.user.id);

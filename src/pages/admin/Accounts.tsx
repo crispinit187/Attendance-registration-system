@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { errMsg, fmtDate } from '../../lib/format';
 import type { Account, AccountState, AccountStatus } from '../../lib/types';
+import { ActionMenu } from '../../components/ActionMenu';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 
 const ROLE_HELP: Record<string, string> = {
@@ -46,6 +47,8 @@ export function Accounts() {
   const reload = () => { void qc.invalidateQueries({ queryKey: ['accounts'] }); void qc.invalidateQueries({ queryKey: ['account-statuses'] }); void qc.invalidateQueries({ queryKey: ['grants'] }); };
   const pname = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.full_name])), [people.data]);
   const ename = useMemo(() => new Map((events.data ?? []).map((e) => [e.id, e.name])), [events.data]);
+  const signupLists = useQuery({ queryKey: ['signup-lists'], queryFn: api.signupLists, refetchInterval: 30_000 });
+  const sname = useMemo(() => new Map((signupLists.data ?? []).map((l) => [l.id, l.title])), [signupLists.data]);
   const lname = useMemo(() => new Map((lists.data ?? []).map((l) => [l.id, l.title])), [lists.data]);
 
   if (accounts.isLoading) return <div className="page wide"><Loading /></div>;
@@ -77,7 +80,7 @@ export function Accounts() {
       <input className="input" placeholder="Search accounts…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Linked person</th><th>Since</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Linked person</th><th>Since</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>
             {rows.map((a) => {
               const mine = (grants.data ?? []).filter((g) => g.account_id === a.id);
@@ -86,8 +89,9 @@ export function Accounts() {
                   <td><b>{a.full_name || '—'}</b> {a.disabled && <Badge kind="danger">disabled</Badge>}</td>
                   <td>{a.email}</td>
                   <td><Badge kind={a.role === 'admin' ? 'accent' : ''}>{a.role}</Badge>
-                    {a.role === 'reviewer' && <div className="muted small" style={{ whiteSpace: 'normal' }}>
-                      {mine.length ? mine.map((g) => (g.event_id ? `Event: ${ename.get(g.event_id)}` : `List: ${lname.get(g.list_id!)}`)).join(', ') : 'No access yet'}</div>}
+                    {(a.role === 'reviewer' || a.role === 'registrar') && <div className="muted small" style={{ whiteSpace: 'normal' }}>
+                      {a.access_scope === 'all' ? 'All events and lists'
+                        : mine.length ? mine.map((g) => (g.event_id ? `Event: ${ename.get(g.event_id)}` : g.list_id ? `List: ${lname.get(g.list_id)}` : `Sign-ups: ${sname.get(g.signup_list_id!)}`)).join(', ') : 'Selected only, none given yet'}</div>}
                   </td>
                   <td>{(() => {
                     const s = stMap.get(a.id); const k = stateOf(a, s);
@@ -102,17 +106,21 @@ export function Accounts() {
                   })()}</td>
                   <td>{a.person_id ? pname.get(a.person_id) ?? 'Linked' : <span className="muted">none</span>}</td>
                   <td>{fmtDate(a.created_at)}</td>
-                  <td className="row" style={{ flexWrap: 'nowrap' }}>
-                    {a.role === 'reviewer' && <button className="btn small" onClick={() => setGranting(a)}>Access…</button>}
-                    {!a.person_id && a.role !== 'reviewer' && <button className="btn small ghost" onClick={() => setLinking(a)}>Link person…</button>}
-                    {stateOf(a, stMap.get(a.id)) === 'pending' && <button className="btn small" onClick={() => setVerifying(a)}>Verify now…</button>}
-                    {stateOf(a, stMap.get(a.id)) === 'pending' && a.must_set_password && (
-                      <button className="btn small ghost" onClick={async () => { try { await api.resendInvite(a.id); toast('Invitation sent again.'); } catch (e) { toast(errMsg(e)); } }}>Resend invite</button>
-                    )}
-                    {a.id !== session?.user.id && (
-                      <button className={`btn small ${a.disabled ? '' : 'danger'}`} onClick={() => setToggle(a)}>{a.disabled ? 'Enable' : 'Disable'}</button>
-                    )}
-                    {(a.disabled || stateOf(a, stMap.get(a.id)) === 'pending') && a.id !== session?.user.id && <button className="btn small danger" onClick={() => setRemoving(a)}>Delete…</button>}
+                  <td style={{ width: 56, textAlign: 'right' }}>
+                    {(() => {
+                      const k = stateOf(a, stMap.get(a.id));
+                      const self = a.id === session?.user.id;
+                      return (
+                        <ActionMenu label={`Actions for ${a.full_name || a.email}`} items={[
+                          { label: 'Access and permissions…', hint: a.access_scope === 'all' ? 'Has access to everything' : 'Only what you choose', hidden: !(a.role === 'registrar' || a.role === 'reviewer'), onClick: () => setGranting(a) },
+                          { label: 'Link to a person…', hidden: !!a.person_id || a.role === 'reviewer', onClick: () => setLinking(a) },
+                          { label: 'Verify now…', hint: 'Skip the email link', hidden: k !== 'pending', onClick: () => setVerifying(a) },
+                          { label: 'Resend invite', hidden: !(k === 'pending' && a.must_set_password), onClick: async () => { try { await api.resendInvite(a.id); toast('Invitation sent again.'); } catch (e) { toast(errMsg(e)); } } },
+                          { label: a.disabled ? 'Enable account' : 'Disable account', danger: !a.disabled, hidden: self, onClick: () => setToggle(a) },
+                          { label: 'Delete account…', danger: true, hidden: self || !(a.disabled || k === 'pending'), onClick: () => setRemoving(a) },
+                        ]} />
+                      );
+                    })()}
                   </td>
                 </tr>
               );
@@ -145,6 +153,7 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('reviewer');
+  const [scope, setScope] = useState<'all' | 'selected'>('all');
   const [personQ, setPersonQ] = useState('');
   const [person, setPerson] = useState<{ id: string; full_name: string } | null>(null);
   const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
@@ -159,7 +168,7 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setErr('Please enter a valid email address.');
     if (name.trim().length < 2) return setErr('Please enter their name.');
     setBusy(true);
-    try { await api.invite({ email: email.trim(), full_name: name.trim(), role, person_id: person?.id ?? null }); setSent(true); }
+    try { await api.invite({ email: email.trim(), full_name: name.trim(), role, person_id: person?.id ?? null, scope }); setSent(true); }
     catch (x) { setErr(errMsg(x)); } finally { setBusy(false); }
   };
   if (sent) return (
@@ -179,6 +188,13 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
             <option value="member">Member (for someone you already registered)</option><option value="admin">Admin</option>
           </select>
         </Field>
+        {(role === 'reviewer' || role === 'registrar') && (
+          <Field label="Access" hint={scope === 'selected' ? 'Choose their events and lists afterwards from the ⋯ menu on their row.' : 'Every event and list, including future ones.'}>
+            <select className="input" value={scope} onChange={(e) => setScope(e.target.value as 'all' | 'selected')}>
+              <option value="all">All events and lists</option><option value="selected">Only what I select</option>
+            </select>
+          </Field>
+        )}
         <Field label="Full name"><input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></Field>
         <Field label="Email"><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         {(role === 'member') && (
@@ -220,30 +236,62 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
   const toast = useToast();
   const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
+  const signups = useQuery({ queryKey: ['signup-lists'], queryFn: api.signupLists, refetchInterval: 30_000 });
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
+  const [scope, setScope] = useState<'all' | 'selected'>(account.access_scope);
   const [ev, setEv] = useState('');
   const [li, setLi] = useState('');
+  const [sl, setSl] = useState('');
+  const [busy, setBusy] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);   // the access grant being removed (asks first)
+  const isRegistrar = account.role === 'registrar';
   const mine = (grants.data ?? []).filter((g) => g.account_id === account.id);
-  const name = (g: (typeof mine)[number]) => (g.event_id ? `Whole event: ${events.data?.find((e) => e.id === g.event_id)?.name}` : `List: ${lists.data?.find((l) => l.id === g.list_id)?.title}`);
-  const add = async (event: string | null, list: string | null) => {
-    try { await api.grant(account.id, event, list); onChanged(); void grants.refetch(); setEv(''); setLi(''); } catch (e) { toast(errMsg(e)); }
+  const name = (g: (typeof mine)[number]) => (g.event_id ? `Whole event: ${events.data?.find((e) => e.id === g.event_id)?.name}`
+    : g.list_id ? `List: ${lists.data?.find((l) => l.id === g.list_id)?.title}` : `Sign-up list: ${signups.data?.find((l) => l.id === g.signup_list_id)?.title}`);
+  const add = async (event: string | null, list: string | null, signup: string | null) => {
+    try { await api.grant(account.id, event, list, signup); onChanged(); void grants.refetch(); setEv(''); setLi(''); setSl(''); } catch (e) { toast(errMsg(e)); }
+  };
+  const change = async (next: 'all' | 'selected') => {
+    if (next === scope || busy) return;
+    setBusy(true);
+    try { await api.setScope(account.id, next); setScope(next); onChanged(); toast(next === 'all' ? 'Now has access to everything.' : 'Now limited to the access you choose.'); }
+    catch (e) { toast(errMsg(e)); } finally { setBusy(false); }
   };
   return (
-    <Modal title={`What can ${account.full_name || account.email} see?`} onClose={onClose}>
+    <Modal title={`Access for ${account.full_name || account.email}`} onClose={onClose}>
       <div className="stack">
-        {mine.length === 0 ? <Alert kind="warn">No access yet. They will see nothing until you add some.</Alert> : mine.map((g) => (
-          <div className="item" key={g.id}><div className="grow">{name(g)}</div>
-            <button className="btn small danger" onClick={() => setRevoking(g.id)}>Remove</button></div>
-        ))}
-        <Field label="Give access to a whole event (all its lists, now and later)">
-          <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
-            <button className="btn" disabled={!ev} onClick={() => add(ev, null)}>Add</button></div>
-        </Field>
-        <Field label="Or to one list only">
-          <div className="row"><select className="input grow" value={li} onChange={(e) => setLi(e.target.value)}><option value="">Choose list…</option>{lists.data?.filter((l) => l.status !== 'archived').map((l) => <option key={l.id} value={l.id}>{l.title} ({events.data?.find((e) => e.id === l.event_id)?.name})</option>)}</select>
-            <button className="btn" disabled={!li} onClick={() => add(null, li)}>Add</button></div>
-        </Field>
+        <div className="stack" style={{ gap: 8 }}>
+          <b className="small">What can this {account.role} work with?</b>
+          <label className="check"><input type="radio" name="scope" checked={scope === 'all'} disabled={busy} onChange={() => void change('all')} />
+            <span><b>All events and lists</b><br /><span className="hint">Everything, including future ones{isRegistrar ? ', and every sign-up list' : ''}.</span></span></label>
+          <label className="check"><input type="radio" name="scope" checked={scope === 'selected'} disabled={busy} onChange={() => void change('selected')} />
+            <span><b>Only what I select</b><br /><span className="hint">Just the events and lists you add below{isRegistrar ? ' (sign-up lists too)' : ''}. You can add or remove them at any time.</span></span></label>
+        </div>
+
+        {scope === 'all' ? (
+          <Alert kind="info">This {account.role} already has access to everything. Switch to “Only what I select” to limit them. The choices you add below are kept.</Alert>
+        ) : (
+          <>
+            {mine.length === 0 ? <Alert kind="warn">No access yet. They will see nothing until you add some.</Alert> : mine.map((g) => (
+              <div className="item" key={g.id}><div className="grow">{name(g)}</div>
+                <button className="btn small danger" onClick={() => setRevoking(g.id)}>Remove</button></div>
+            ))}
+            <Field label="Give access to a whole event (all its lists, now and later)">
+              <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
+                <button className="btn" disabled={!ev} onClick={() => add(ev, null, null)}>Add</button></div>
+            </Field>
+            <Field label="Or to one list only">
+              <div className="row"><select className="input grow" value={li} onChange={(e) => setLi(e.target.value)}><option value="">Choose list…</option>{lists.data?.filter((l) => l.status !== 'archived').map((l) => <option key={l.id} value={l.id}>{events.data?.find((e) => e.id === l.event_id)?.name}: {l.title}</option>)}</select>
+                <button className="btn" disabled={!li} onClick={() => add(null, li, null)}>Add</button></div>
+            </Field>
+            {isRegistrar && (
+              <Field label="Sign-up lists">
+                <div className="row"><select className="input grow" value={sl} onChange={(e) => setSl(e.target.value)}><option value="">Choose sign-up list…</option>{signups.data?.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>
+                  <button className="btn" disabled={!sl} onClick={() => add(null, null, sl)}>Add</button></div>
+              </Field>
+            )}
+          </>
+        )}
         <button className="btn ghost block" onClick={onClose}>Close</button>
       </div>
       {revoking && (() => {

@@ -3,6 +3,7 @@ export type Role = 'admin' | 'reviewer' | 'registrar' | 'member';
 export interface Account {
   id: string; email: string | null; full_name: string | null; role: Role;
   person_id: string | null; must_set_password: boolean; disabled: boolean; created_at: string;
+  access_scope: 'all' | 'selected';   // registrars and reviewers: everything, or only what was granted
 }
 export interface AccountStatus { id: string; verified_at: string | null; last_sign_in_at: string | null; invited_at: string | null }
 export type AccountState = 'pending' | 'setup' | 'active' | 'disabled';
@@ -50,7 +51,7 @@ export interface Breakdown {
   list_id: string; title: string; status: string; opened_at: string | null; total: number;
   areas: Record<string, number>; voices: Record<string, number>; districts: Record<string, number>;
 }
-export interface Grant { id: string; account_id: string; event_id: string | null; list_id: string | null; created_at: string }
+export interface Grant { id: string; account_id: string; event_id: string | null; list_id: string | null; signup_list_id: string | null; created_at: string }
 export interface AuditRow {
   id: number; at: string; actor_id: string | null; actor_name: string | null; action: string;
   target_type: string | null; target_id: string | null; details: Record<string, unknown>;

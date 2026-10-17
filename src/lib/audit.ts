@@ -9,6 +9,7 @@ export function describeAudit(r: AuditRow): { what: string; why: string } {
     case 'attendance.remove': return { what: `removed ${s(d.person)} from ${s(d.list_title)}`, why: d.reason ? `Reason: ${s(d.reason)}` : '' };
     case 'attendance.restore': return { what: `restored ${s(d.person)} on ${s(d.list_title)}`, why: '' };
     case 'account.verify': return { what: `verified the email of ${s(d.email)} by hand`, why: '' };
+    case 'account.scope': return { what: `${d.scope === 'all' ? 'gave access to everything' : 'limited access to selected items'} for ${s(d.email)} (${s(d.role)})`, why: '' };
     case 'account.resend': return { what: `sent the invitation again to ${s(d.email)}`, why: '' };
     case 'account.delete': return { what: `deleted the account ${s(d.email)} (${s(d.role)})`, why: '' };
     case 'attendance.undo': return { what: `undid a mark for ${s(d.person)} on ${s(d.list_title)}`, why: '' };

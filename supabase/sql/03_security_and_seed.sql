@@ -35,14 +35,15 @@ begin
      where n.nspname = 'public'
        and p.proname = any (array[
          'app_role', 'my_person_id', 'can_review_list', 'can_review_event',
+         'list_access', 'event_access', 'signup_access',
          'suggest_districts', 'save_my_profile', 'clear_must_set_password',
-         'get_open_list', 'mark_my_attendance', 'mark_attendance_manual',
+         'get_open_lists', 'mark_my_attendance', 'mark_attendance_manual',
          'undo_attendance', 'remove_attendance', 'restore_attendance', 'list_present',
          'search_people', 'create_person', 'update_person', 'archive_person',
          'restore_person', 'delete_person', 'merge_people',
          'create_event', 'rename_event', 'save_list', 'open_list', 'close_list',
          'archive_list', 'unarchive_list', 'delete_list', 'get_qr_payload',
-         'set_account_disabled', 'account_statuses', 'link_account_person', 'grant_reviewer', 'revoke_grant',
+         'set_account_disabled', 'account_statuses', 'link_account_person', 'grant_access', 'set_account_scope', 'revoke_grant',
          'rename_district', 'merge_districts', 'log_export',
          'my_history', 'event_breakdown', 'district_overview',
          'signup_public_info', 'signup_submit', 'signup_lists_overview', 'signup_get',
@@ -102,7 +103,7 @@ create policy district_variants_read on public.district_variants for select to a
 create policy people_select on public.people for select to authenticated
   using (public.app_role() = 'admin' or id = public.my_person_id());
 
--- Events and lists: admins see all; reviewers see what they were granted
+-- Events and lists: admins see all; reviewers see everything or only what they were granted
 create policy events_select on public.events for select to authenticated
   using (public.app_role() = 'admin' or public.can_review_event(id));
 create policy lists_select on public.lists for select to authenticated

@@ -22,10 +22,14 @@ export function Registrar() {
 
   useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
 
-  const open = useQuery({ queryKey: ['open-list'], queryFn: api.openList, refetchInterval: 15_000 });
+  const opens = useQuery({ queryKey: ['open-lists'], queryFn: api.openLists, refetchInterval: 15_000 });
   const signups = useQuery({ queryKey: ['signup-lists'], queryFn: api.signupLists, refetchInterval: 15_000 });
-  const openSignup = signups.data?.find((l) => l.status === 'open');
-  const listId = open.data?.id ?? null;
+  const openSignups = (signups.data ?? []).filter((l) => l.status === 'open');
+  const [pick, setPick] = useState<string | null>(null);
+  // Several lists can be open. The registrar works on one at a time; this keeps the choice.
+  const current = opens.data?.find((l) => l.id === pick) ?? opens.data?.[0] ?? null;
+  const open = { data: current, isLoading: opens.isLoading, error: opens.error };
+  const listId = current?.id ?? null;
   const present = useQuery({
     queryKey: ['present', listId, true], enabled: !!listId, refetchInterval: 8_000,
     queryFn: () => api.listPresent(listId!, true),
@@ -34,7 +38,7 @@ export function Registrar() {
     queryKey: ['search', dq, listId, present.dataUpdatedAt], enabled: dq.length >= 3 && !!listId,
     queryFn: () => api.searchPeople(dq, listId),
   });
-  const refresh = () => { void qc.invalidateQueries({ queryKey: ['present'] }); void qc.invalidateQueries({ queryKey: ['search'] }); void qc.invalidateQueries({ queryKey: ['open-list'] }); };
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ['present'] }); void qc.invalidateQueries({ queryKey: ['search'] }); void qc.invalidateQueries({ queryKey: ['open-lists'] }); };
 
   const mark = async (p: PersonCard) => {
     try {
@@ -55,22 +59,33 @@ export function Registrar() {
         <HeaderActions />
       </div>
 
-      {openSignup && (
-        <Link to={`/signups/${openSignup.id}`} className="rowcard" style={{ textDecoration: 'none', color: 'inherit' }}>
+      {openSignups.map((s) => (
+        <Link key={s.id} to={`/signups/${s.id}`} className="rowcard" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div style={{ minWidth: 0 }}>
             <div className="openTag">Sign-ups open</div>
-            <div style={{ fontSize: 15, fontWeight: 500, marginTop: 4 }}>{openSignup.title}</div>
-            <div className="muted" style={{ fontSize: 13 }}>{openSignup.entries} signed up · show the QR code or paste a list</div>
+            <div style={{ fontSize: 15, fontWeight: 500, marginTop: 4 }}>{s.title}</div>
+            <div className="muted" style={{ fontSize: 13 }}>{s.entries} signed up · show the QR code or paste a list</div>
           </div>
           <span className="btn small">Open</span>
         </Link>
+      ))}
+
+      {(opens.data?.length ?? 0) > 1 && (
+        <div className="stack" style={{ gap: 6 }}>
+          <div className="muted" style={{ fontSize: 13 }}>Several lists are open. Choose the one you are working on.</div>
+          <div className="row" style={{ gap: 6 }}>
+            {opens.data!.map((l) => (
+              <button key={l.id} type="button" className={`btn small ${l.id === current?.id ? 'primary' : ''}`} onClick={() => setPick(l.id)}>{l.title}</button>
+            ))}
+          </div>
+        </div>
       )}
 
       {open.isLoading ? <Loading /> : open.error ? <Alert>{errMsg(open.error)}</Alert> : !open.data ? (
         <div className="card stack" style={{ gap: 6 }}>
           <div className="openTag off">Not open</div>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 600 }}>No attendance list is open right now</div>
-          <div className="muted" style={{ fontSize: 14 }}>Ask an admin to open a list. It will appear here.</div>
+          <div style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 600 }}>No attendance list is open for you right now</div>
+          <div className="muted" style={{ fontSize: 14 }}>When an admin opens a list you have access to, it will appear here.</div>
         </div>
       ) : (
         <>

@@ -22,13 +22,12 @@ export function Lists() {
   const [form, setForm] = useState<{ event: EventRow; list: ListRow | null } | null>(null);
   const [act, setAct] = useState<{ kind: 'open' | 'close' | 'archive' | 'delete'; list: ListRow } | null>(null);
 
-  const reload = () => { void qc.invalidateQueries({ queryKey: ['lists'] }); void qc.invalidateQueries({ queryKey: ['events'] }); void qc.invalidateQueries({ queryKey: ['open-list'] }); };
+  const reload = () => { void qc.invalidateQueries({ queryKey: ['lists'] }); void qc.invalidateQueries({ queryKey: ['events'] }); void qc.invalidateQueries({ queryKey: ['open-lists'] }); };
   const byEvent = useMemo(() => {
     const m = new Map<string, ListRow[]>();
     for (const l of lists.data ?? []) { if (!showArchived && l.status === 'archived') continue; (m.get(l.event_id) ?? m.set(l.event_id, []).get(l.event_id)!).push(l); }
     return m;
   }, [lists.data, showArchived]);
-  const openList = lists.data?.find((l) => l.status === 'open');
   const wantNew = sp.get('new');
   useEffect(() => {
     if (!wantNew || !events.data) return;
@@ -49,7 +48,6 @@ export function Lists() {
         </div>
       </div>
       {err && <Alert>{errMsg(err)}</Alert>}
-      {openList && <Alert kind="info">Registration is open for <b>{openList.title}</b>. Only one list can be open at a time.</Alert>}
       {!events.data?.length && <div className="card hero muted">No events yet. Create an event (for example “Annual Conference 2026”), then add lists to it.</div>}
 
       {events.data?.filter((ev) => showArchived || !ev.archived_at).map((ev) => {
@@ -111,7 +109,7 @@ export function Lists() {
 
       {act?.kind === 'open' && (
         <ConfirmDialog title={`Open “${act.list.title}”?`} confirmLabel="Open registration"
-          body={<p>Members will be able to mark attendance straight away.{openList && <> <b>“{openList.title}” is open right now</b>, so opening this will be refused until that one is closed.</>}</p>}
+          body={<p>Members will be able to mark attendance straight away. Other lists that are already open stay open.</p>}
           onClose={() => setAct(null)} onConfirm={async () => { await api.openListById(act.list.id); toast('Registration is open.'); reload(); }} />
       )}
       {act?.kind === 'close' && (

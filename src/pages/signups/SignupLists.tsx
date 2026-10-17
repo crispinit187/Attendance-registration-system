@@ -17,7 +17,6 @@ export function SignupLists() {
   const [creating, setCreating] = useState(false);
   const [act, setAct] = useState<{ open: boolean; list: SignupListRow } | null>(null);
   const reload = () => { void qc.invalidateQueries({ queryKey: ['signup-lists'] }); void qc.invalidateQueries({ queryKey: ['signup'] }); };
-  const open = lists.data?.find((l) => l.status === 'open');
 
   return (
     <div className={`page ${isAdmin ? 'wide' : ''} stack`} style={isAdmin ? undefined : { paddingTop: 32, gap: 20 }}>
@@ -30,7 +29,6 @@ export function SignupLists() {
         {isAdmin && <button className="btn primary" onClick={() => setCreating(true)}><Icon name="plus" size={16} />New sign-up list</button>}
       </div>
       {lists.error && <Alert>{errMsg(lists.error)}</Alert>}
-      {isAdmin && open && <Alert kind="info">Sign-ups are open for <b>{open.title}</b>. Only one sign-up list can be open at a time.</Alert>}
 
       {lists.isLoading ? <Loading /> : !lists.data?.length ? (
         <div className="card hero muted">

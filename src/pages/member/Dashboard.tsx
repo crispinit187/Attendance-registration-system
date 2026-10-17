@@ -7,22 +7,14 @@ import { useAuth, useLookups } from '../../lib/auth';
 import { displayName, errMsg, fmtLongDate, fmtTime, initials } from '../../lib/format';
 import { Alert, Icon, Loading, useToast } from '../../components/ui';
 import { HeaderActions } from '../../components/Shell';
+import type { OpenList } from '../../lib/types';
 
 export function Dashboard() {
   const { account, person } = useAuth();
   const { titles, areas, voices } = useLookups();
   const qc = useQueryClient();
   const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  const open = useQuery({ queryKey: ['open-list'], queryFn: api.openList, refetchInterval: 10_000 });
-  const mine = useQuery({
-    queryKey: ['my-mark', open.data?.id, person?.id],
-    enabled: !!open.data && !!person,
-    queryFn: async () => {
-      const { data } = await supabase.from('attendance').select('id,marked_at,method').eq('list_id', open.data!.id).eq('person_id', person!.id).eq('removed', false).maybeSingle();
-      return data as { id: string; marked_at: string; method: string } | null;
-    },
-  });
+  const open = useQuery({ queryKey: ['open-lists'], queryFn: api.openLists, refetchInterval: 10_000 });
   const hist = useQuery({ queryKey: ['my-history'], queryFn: api.myHistory });
   const dist = useQuery({
     queryKey: ['my-district', person?.district_group_id],
@@ -34,7 +26,6 @@ export function Dashboard() {
   });
   const title = titles.find((t) => t.id === person?.title_id)?.name;
   const shownName = person ? displayName(title, person.title_specify, person.full_name) : account?.full_name || '';
-  const recent = mine.data && Date.now() - new Date(mine.data.marked_at).getTime() < 110_000 && mine.data.method === 'self';
   const details: [string, string][] = person ? [
     ['Title', title ?? ''], ['Full name', person.full_name],
     ['Area', areas.find((a) => a.id === person.area_id)?.name ?? ''], ['District', dist.data ?? ''],
@@ -54,29 +45,8 @@ export function Dashboard() {
         <HeaderActions />
       </div>
 
-      {open.isLoading ? <Loading /> : open.error ? <Alert>{errMsg(open.error)}</Alert> : open.data ? (
-        <div className="card live stack" style={{ gap: 14 }}>
-          <div className="openTag">Open now</div>
-          <div>
-            <div style={{ fontFamily: 'var(--serif)', fontSize: 22, lineHeight: 1.25, fontWeight: 600 }}>{open.data.title}</div>
-            <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{open.data.event_name}</div>
-          </div>
-          {mine.data ? (
-            <>
-              <div className="present-ok" style={{ fontSize: 16 }}><Icon name="check" size={20} />You are marked present at {fmtTime(mine.data.marked_at)}</div>
-              {recent && (
-                <button className="btn danger" disabled={busy} onClick={async () => {
-                  setBusy(true);
-                  try { await api.undo(mine.data!.id); toast('Attendance removed.'); await qc.invalidateQueries({ queryKey: ['my-mark'] }); }
-                  catch (e) { toast(errMsg(e)); } finally { setBusy(false); }
-                }}>Marked by mistake? Undo</button>
-              )}
-            </>
-          ) : (
-            <Link to="/app/scan" className="btn primary" style={{ height: 54, borderRadius: 14, fontSize: 17 }}><Icon name="scan" size={22} />Scan QR to mark attendance</Link>
-          )}
-          {open.data.location_check && <div className="muted" style={{ fontSize: 13, lineHeight: 1.45 }}>This list checks your location against the venue (within {open.data.radius_m} m). Allow location when asked.</div>}
-        </div>
+      {open.isLoading ? <Loading /> : open.error ? <Alert>{errMsg(open.error)}</Alert> : open.data?.length ? (
+        open.data.map((l) => <OpenCard key={l.id} list={l} personId={person?.id} />)
       ) : (
         <div className="card stack" style={{ gap: 6 }}>
           <div className="openTag off">Not open</div>
@@ -104,6 +74,46 @@ export function Dashboard() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** One open list: shows whether you are marked, with the quick undo for a scan made by mistake. */
+function OpenCard({ list, personId }: { list: OpenList; personId: string | undefined }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const mine = useQuery({
+    queryKey: ['my-mark', list.id, personId],
+    enabled: !!personId,
+    queryFn: async () => {
+      const { data } = await supabase.from('attendance').select('id,marked_at,method').eq('list_id', list.id).eq('person_id', personId!).eq('removed', false).maybeSingle();
+      return data as { id: string; marked_at: string; method: string } | null;
+    },
+  });
+  const recent = mine.data && Date.now() - new Date(mine.data.marked_at).getTime() < 110_000 && mine.data.method === 'self';
+  return (
+    <div className="card live stack" style={{ gap: 14 }}>
+      <div className="openTag">Open now</div>
+      <div>
+        <div style={{ fontFamily: 'var(--serif)', fontSize: 22, lineHeight: 1.25, fontWeight: 600 }}>{list.title}</div>
+        <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{list.event_name}</div>
+      </div>
+      {mine.data ? (
+        <>
+          <div className="present-ok" style={{ fontSize: 16 }}><Icon name="check" size={20} />You are marked present at {fmtTime(mine.data.marked_at)}</div>
+          {recent && (
+            <button className="btn danger" disabled={busy} onClick={async () => {
+              setBusy(true);
+              try { await api.undo(mine.data!.id); toast('Attendance removed.'); await qc.invalidateQueries({ queryKey: ['my-mark'] }); }
+              catch (e) { toast(errMsg(e)); } finally { setBusy(false); }
+            }}>Marked by mistake? Undo</button>
+          )}
+        </>
+      ) : (
+        <Link to="/app/scan" className="btn primary" style={{ height: 54, borderRadius: 14, fontSize: 17 }}><Icon name="scan" size={22} />Scan QR to mark attendance</Link>
+      )}
+      {list.location_check && <div className="muted" style={{ fontSize: 13, lineHeight: 1.45 }}>This list checks your location against the venue (within {list.radius_m} m). Allow location when asked.</div>}
     </div>
   );
 }
