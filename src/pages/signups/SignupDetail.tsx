@@ -6,7 +6,8 @@ import { errMsg, fmtDateTime, initials } from '../../lib/format';
 import type { PersonCard, ProfileInput, SignupDetailInfo, SignupEntry, SignupMatch } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 import { PersonForm } from '../../components/PersonForm';
-import { StaffTop, useIsAdmin } from './common';
+import { StaffTop, useCanManage, useIsAdmin } from './common';
+import { TeamPanel } from '../../components/TeamPanel';
 import { PasteTab } from './PasteTab';
 import { QrTab } from './QrTab';
 
@@ -14,7 +15,8 @@ type Tab = 'entries' | 'paste' | 'qr';
 
 export function SignupDetail() {
   const { id = '' } = useParams();
-  const isAdmin = useIsAdmin();
+  const isAdmin = useCanManage();   // admins and event managers
+  const reallyAdmin = useIsAdmin();
   const qc = useQueryClient();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('entries');
@@ -41,6 +43,8 @@ export function SignupDetail() {
         <div style={{ textAlign: 'right' }}><div className="count">{list.entries}</div><div className="muted small">signed up</div></div>
       </div>
 
+      {isAdmin && <TeamPanel kind="signup" targetId={list.id} canEdit={reallyAdmin} />}
+
       <div className={`statusbar ${open ? 'open' : ''}`}>
         <div className="row" style={{ gap: 10 }}>
           <span className={`statusline ${open ? 'ok' : 'warn'}`}>{open ? 'Sign-ups open' : 'Sign-ups closed'}</span>
@@ -57,7 +61,7 @@ export function SignupDetail() {
         <button role="tab" aria-selected={tab === 'qr'} className={tab === 'qr' ? 'on' : ''} onClick={() => setTab('qr')}>{isAdmin ? 'QR and settings' : 'QR and link'}</button>
       </div>
 
-      {tab === 'entries' && <EntriesTab list={list} isAdmin={isAdmin} />}
+      {tab === 'entries' && <EntriesTab list={list} isAdmin={isAdmin} reallyAdmin={reallyAdmin} />}
       {tab === 'paste' && <PasteTab list={list} />}
       {tab === 'qr' && <QrTab list={list} isAdmin={isAdmin} />}
 
@@ -76,7 +80,7 @@ export function SignupDetail() {
 const srcLabel = (e: SignupEntry) =>
   e.source === 'public' ? 'QR or link' : e.source === 'paste' ? `Pasted by ${e.added_by_name ?? 'staff'}` : `Added by ${e.added_by_name ?? 'staff'}`;
 
-function EntriesTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: boolean }) {
+function EntriesTab({ list, isAdmin, reallyAdmin }: { list: SignupDetailInfo; isAdmin: boolean; reallyAdmin: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [withRemoved, setWithRemoved] = useState(false);
@@ -147,11 +151,11 @@ function EntriesTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: boolea
                     <td style={{ textDecoration: 'none' }}>
                       <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
                         {!r.removed && r.can_edit && <button className="btn small" onClick={() => setEditing(r)}>Edit</button>}
-                        {!r.removed && isAdmin && !r.person_id && <button className="btn small" onClick={() => void startAccount(r)}>Create account</button>}
-                        {!r.removed && isAdmin && !r.person_id && <button className="btn small ghost" onClick={() => setMerging(r)}>Merge…</button>}
+                        {!r.removed && reallyAdmin && !r.person_id && <button className="btn small" onClick={() => void startAccount(r)}>Create account</button>}
+                        {!r.removed && reallyAdmin && !r.person_id && <button className="btn small ghost" onClick={() => setMerging(r)}>Merge…</button>}
                         {!r.removed && r.can_edit && <button className="btn small danger" onClick={() => setRemoving(r)}>Remove</button>}
                         {r.removed && isAdmin && <button className="btn small" onClick={async () => { try { await api.signupRestore(r.id); toast('Restored.'); reload(); } catch (x) { toast(errMsg(x)); } }}>Restore</button>}
-                        {r.removed && isAdmin && <button className="btn small danger" onClick={() => setPurging(r)}>Delete forever…</button>}
+                        {r.removed && reallyAdmin && <button className="btn small danger" onClick={() => setPurging(r)}>Delete forever…</button>}
                       </div>
                     </td>
                   </tr>
@@ -160,7 +164,7 @@ function EntriesTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: boolea
             </table>
           </div>
         )}
-        {isAdmin && <p className="muted small" style={{ margin: '10px 0 0' }}>
+        {reallyAdmin && <p className="muted small" style={{ margin: '10px 0 0' }}>
           <b>Create account</b> adds the person to People and invites them to make an account. <b>Merge…</b> attaches the entry to someone who is already in People, for example after they made their own account.
         </p>}
       </div>

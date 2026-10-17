@@ -11,8 +11,11 @@ const ROLE_HELP: Record<string, string> = {
   member: 'Marks their own attendance by scanning.',
   registrar: 'Registers people at the venue, including people without phones or accounts.',
   reviewer: 'Sees reports and exports for the events or lists you give them.',
+  manager: 'Runs the events and sign-up lists you give them: creates lists, opens and closes registration, marks attendance, sees contact numbers and exports. Cannot create events or use Accounts, Setup, Districts or the audit log.',
   admin: 'Full control.',
 };
+
+const ROLE_LABEL: Record<string, string> = { admin: 'admin', manager: 'event manager', reviewer: 'reviewer', registrar: 'registrar', member: 'member' };
 
 const STATE_LABEL: Record<AccountState, string> = { pending: 'Pending verification', setup: 'Verified, no details yet', active: 'Active', disabled: 'Disabled' };
 
@@ -88,9 +91,9 @@ export function Accounts() {
                 <tr key={a.id}>
                   <td><b>{a.full_name || '—'}</b> {a.disabled && <Badge kind="danger">disabled</Badge>}</td>
                   <td>{a.email}</td>
-                  <td><Badge kind={a.role === 'admin' ? 'accent' : ''}>{a.role}</Badge>
-                    {(a.role === 'reviewer' || a.role === 'registrar') && <div className="muted small" style={{ whiteSpace: 'normal' }}>
-                      {a.access_scope === 'all' ? 'All events and lists'
+                  <td><Badge kind={a.role === 'admin' ? 'accent' : ''}>{ROLE_LABEL[a.role] ?? a.role}</Badge>
+                    {(a.role === 'reviewer' || a.role === 'registrar' || a.role === 'manager') && <div className="muted small" style={{ whiteSpace: 'normal' }}>
+                      {a.access_scope === 'all' && a.role !== 'manager' ? 'All events and lists'
                         : mine.length ? mine.map((g) => (g.event_id ? `Event: ${ename.get(g.event_id)}` : g.list_id ? `List: ${lname.get(g.list_id)}` : `Sign-ups: ${sname.get(g.signup_list_id!)}`)).join(', ') : 'Selected only, none given yet'}</div>}
                   </td>
                   <td>{(() => {
@@ -112,8 +115,8 @@ export function Accounts() {
                       const self = a.id === session?.user.id;
                       return (
                         <ActionMenu label={`Actions for ${a.full_name || a.email}`} items={[
-                          { label: 'Access and permissions…', hint: a.access_scope === 'all' ? 'Has access to everything' : 'Only what you choose', hidden: !(a.role === 'registrar' || a.role === 'reviewer'), onClick: () => setGranting(a) },
-                          { label: 'Link to a person…', hidden: !!a.person_id || a.role === 'reviewer', onClick: () => setLinking(a) },
+                          { label: 'Access and permissions…', hint: a.access_scope === 'all' && a.role !== 'manager' ? 'Has access to everything' : 'Only what you choose', hidden: !(a.role === 'registrar' || a.role === 'reviewer' || a.role === 'manager'), onClick: () => setGranting(a) },
+                          { label: 'Link to a person…', hidden: !!a.person_id || a.role === 'reviewer' || a.role === 'manager', onClick: () => setLinking(a) },
                           { label: 'Verify now…', hint: 'Skip the email link', hidden: k !== 'pending', onClick: () => setVerifying(a) },
                           { label: 'Resend invite', hidden: !(k === 'pending' && a.must_set_password), onClick: async () => { try { await api.resendInvite(a.id); toast('Invitation sent again.'); } catch (e) { toast(errMsg(e)); } } },
                           { label: a.disabled ? 'Enable account' : 'Disable account', danger: !a.disabled, hidden: self, onClick: () => setToggle(a) },
@@ -184,10 +187,11 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
       <form className="stack" onSubmit={submit} noValidate>
         <Field label="Role" hint={ROLE_HELP[role]}>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="reviewer">Reviewer</option><option value="registrar">Registrar</option>
+            <option value="manager">Event manager</option><option value="reviewer">Reviewer</option><option value="registrar">Registrar</option>
             <option value="member">Member (for someone you already registered)</option><option value="admin">Admin</option>
           </select>
         </Field>
+        {role === 'manager' && <Alert kind="info">An event manager works only with the events and sign-up lists you give them. After creating the account, choose them from the ⋯ menu on their row (Access and permissions), or from the event or sign-up list itself.</Alert>}
         {(role === 'reviewer' || role === 'registrar') && (
           <Field label="Access" hint={scope === 'selected' ? 'Choose their events and lists afterwards from the ⋯ menu on their row.' : 'Every event and list, including future ones.'}>
             <select className="input" value={scope} onChange={(e) => setScope(e.target.value as 'all' | 'selected')}>
@@ -245,6 +249,8 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
   const [busy, setBusy] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);   // the access grant being removed (asks first)
   const isRegistrar = account.role === 'registrar';
+  const isManager = account.role === 'manager';   // always limited to what is selected, events and sign-up lists only
+  const hasSignups = isRegistrar || isManager;
   const mine = (grants.data ?? []).filter((g) => g.account_id === account.id);
   const name = (g: (typeof mine)[number]) => (g.event_id ? `Whole event: ${events.data?.find((e) => e.id === g.event_id)?.name}`
     : g.list_id ? `List: ${lists.data?.find((l) => l.id === g.list_id)?.title}` : `Sign-up list: ${signups.data?.find((l) => l.id === g.signup_list_id)?.title}`);
@@ -260,15 +266,15 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
   return (
     <Modal title={`Access for ${account.full_name || account.email}`} onClose={onClose}>
       <div className="stack">
-        <div className="stack" style={{ gap: 8 }}>
+        {!isManager && <div className="stack" style={{ gap: 8 }}>
           <b className="small">What can this {account.role} work with?</b>
           <label className="check"><input type="radio" name="scope" checked={scope === 'all'} disabled={busy} onChange={() => void change('all')} />
             <span><b>All events and lists</b><br /><span className="hint">Everything, including future ones{isRegistrar ? ', and every sign-up list' : ''}.</span></span></label>
           <label className="check"><input type="radio" name="scope" checked={scope === 'selected'} disabled={busy} onChange={() => void change('selected')} />
-            <span><b>Only what I select</b><br /><span className="hint">Just the events and lists you add below{isRegistrar ? ' (sign-up lists too)' : ''}. You can add or remove them at any time.</span></span></label>
-        </div>
+            <span><b>Only what I select</b><br /><span className="hint">Just the events and lists you add below{hasSignups ? ' (sign-up lists too)' : ''}. You can add or remove them at any time.</span></span></label>
+        </div>}
 
-        {scope === 'all' ? (
+        {scope === 'all' && !isManager ? (
           <Alert kind="info">This {account.role} already has access to everything. Switch to “Only what I select” to limit them. The choices you add below are kept.</Alert>
         ) : (
           <>
@@ -280,11 +286,11 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
               <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
                 <button className="btn" disabled={!ev} onClick={() => add(ev, null, null)}>Add</button></div>
             </Field>
-            <Field label="Or to one list only">
+            {!isManager && <Field label="Or to one list only">
               <div className="row"><select className="input grow" value={li} onChange={(e) => setLi(e.target.value)}><option value="">Choose list…</option>{lists.data?.filter((l) => l.status !== 'archived').map((l) => <option key={l.id} value={l.id}>{events.data?.find((e) => e.id === l.event_id)?.name}: {l.title}</option>)}</select>
                 <button className="btn" disabled={!li} onClick={() => add(null, li, null)}>Add</button></div>
-            </Field>
-            {isRegistrar && (
+            </Field>}
+            {hasSignups && (
               <Field label="Sign-up lists">
                 <div className="row"><select className="input grow" value={sl} onChange={(e) => setSl(e.target.value)}><option value="">Choose sign-up list…</option>{signups.data?.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>
                   <button className="btn" disabled={!sl} onClick={() => add(null, null, sl)}>Add</button></div>

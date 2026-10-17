@@ -39,8 +39,8 @@ export function describeAudit(r: AuditRow): { what: string; why: string } {
     case 'account.disable': return { what: `disabled the account of ${s(d.email)}`, why: '' };
     case 'account.enable': return { what: `enabled the account of ${s(d.email)}`, why: '' };
     case 'account.link': return { what: `linked the account of ${s(d.email)} to a person`, why: '' };
-    case 'grant.add': return { what: `gave ${s(d.email)} reviewer access`, why: d.event_id ? 'Whole event' : 'One list' };
-    case 'grant.remove': return { what: 'removed a reviewer access grant', why: '' };
+    case 'grant.add': return { what: `gave ${s(d.email)} access`, why: d.event_id ? 'Whole event' : d.signup_list_id ? 'One sign-up list' : 'One list' };
+    case 'grant.remove': return { what: 'removed an access grant', why: d.event_id ? 'Whole event' : d.signup_list_id ? 'One sign-up list' : 'One list' };
     case 'person.archive': return { what: `archived ${s(d.person)}`, why: '' };
     case 'person.restore': return { what: `restored ${s(d.person)}`, why: '' };
     case 'person.delete': return { what: `deleted ${s(d.person)}`, why: '' };

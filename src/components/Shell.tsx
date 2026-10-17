@@ -23,6 +23,11 @@ const ADMIN: Item[] = [
   { to: '/admin/audit', label: 'Audit log', icon: 'log' },
   { to: '/admin/exports', label: 'Exports', icon: 'down' },
 ];
+const MANAGER: Item[] = [
+  { to: '/manage/lists', label: 'Events and lists', icon: 'cal' },
+  { to: '/signups', label: 'Sign-ups', icon: 'link' },
+  { to: '/manage/exports', label: 'Exports', icon: 'down' },
+];
 const REVIEWER = [
   { id: 'rv-top', label: 'Overview', icon: 'home' },
   { id: 'rv-access', label: 'Lists', icon: 'list' },
@@ -89,14 +94,15 @@ export function Shell() {
     );
   }
 
-  // Admin and reviewer: sidebar on desktop, top bar on phones.
+  // Admin, event manager and reviewer: sidebar on desktop, top bar on phones.
   const isAdmin = role === 'admin';
+  const items = isAdmin ? ADMIN : role === 'manager' ? MANAGER : null;
   return (
     <div className="shell admin">
       <nav className="sidenav" aria-label="Sections">
         <div className="brand" style={{ padding: '0 8px 18px', margin: 0, fontSize: 12 }}><svg width="36" height="36" viewBox="0 0 44 44" aria-hidden="true"><rect x="2" y="2" width="40" height="40" rx="12" fill="var(--accent)" /><path d="M13 23l6 6 12-13" fill="none" stroke="var(--accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg><div>Attendance<br />Registration</div></div>
-        {isAdmin
-          ? ADMIN.map((i) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}>{i.label}</NavLink>)
+        {items
+          ? items.map((i) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}>{i.label}</NavLink>)
           : REVIEWER.map((i) => <a key={i.id} href="#" className={(active || 'rv-top') === i.id ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActive(i.id); jump(i.id); }}>{i.label}</a>)}
         <div className="signed">Signed in as<br /><b>{name}</b>
           <div style={{ marginTop: 10 }}><HeaderActions /></div></div>
@@ -109,9 +115,9 @@ export function Shell() {
         </header>
         <Outlet />
       </div>
-      {isAdmin && (
+      {items && (
         <nav className="bottomnav" aria-label="Sections" style={{ overflowX: 'auto', justifyContent: 'flex-start' }}>
-          {ADMIN.map((i) => (
+          {items.map((i) => (
             <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')} style={{ minWidth: 84, fontSize: 11, textAlign: 'center' }}><Icon name={i.icon} size={20} />{i.label.split(' ')[0]}</NavLink>
           ))}
         </nav>

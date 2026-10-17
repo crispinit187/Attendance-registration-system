@@ -7,7 +7,9 @@ import { useLiveAttendance } from '../../lib/live';
 import { scanUrl } from '../../lib/qrurl';
 import { download, errMsg, initials, safeName } from '../../lib/format';
 import type { AttendanceRow, PersonCard } from '../../lib/types';
+import { useBase } from '../../lib/auth';
 import { Alert, Badge, Bars, ConfirmDialog, Icon, Loading, useToast } from '../../components/ui';
+import { AddPerson } from '../../components/AddPerson';
 import { AttendanceTable, useRowFilter } from '../../components/AttendanceTable';
 import { ExportPanel } from '../../components/ExportPanel';
 
@@ -15,6 +17,7 @@ export function ListDetail() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const toast = useToast();
+  const base = useBase();
   const [withRemoved, setWithRemoved] = useState(false);
   const [removing, setRemoving] = useState<AttendanceRow | null>(null);
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
@@ -34,13 +37,13 @@ export function ListDetail() {
   };
 
   if (lists.isLoading) return <div className="page wide"><Loading /></div>;
-  if (!list) return <div className="page wide"><Alert>List not found. <Link to="/admin/lists">Back to lists</Link></Alert></div>;
+  if (!list) return <div className="page wide"><Alert>List not found. <Link to={`${base}/lists`}>Back to lists</Link></Alert></div>;
 
   return (
     <div className="page wide stack">
       <div className="row between">
         <div>
-          <Link to="/admin/lists" className="small">← Events & lists</Link>
+          <Link to={`${base}/lists`} className="small">← Events & lists</Link>
           <h1 style={{ margin: '4px 0 0' }}>{list.title}</h1>
           <div className="muted">{ev?.name} <Badge kind={list.status === 'open' ? 'ok' : list.status === 'archived' ? 'warn' : ''}>{list.status}</Badge></div>
         </div>
@@ -48,6 +51,7 @@ export function ListDetail() {
       </div>
 
       {list.status === 'open' && <AdminMark listId={list.id} onDone={reload} />}
+      {list.status === 'open' && <AddPerson id="add-person" listId={list.id} onDone={reload} />}
 
       <div className="grid c3">
         <div className="card"><h3>By area</h3><Bars data={stats('area')} /></div>

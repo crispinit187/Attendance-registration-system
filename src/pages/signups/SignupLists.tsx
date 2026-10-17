@@ -6,10 +6,10 @@ import { errMsg, fmtDateTime } from '../../lib/format';
 import type { SignupListRow } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Icon, Loading, useToast } from '../../components/ui';
 import { SignupForm } from './SignupForm';
-import { StaffTop, useIsAdmin } from './common';
+import { StaffTop, useCanManage } from './common';
 
 export function SignupLists() {
-  const isAdmin = useIsAdmin();
+  const isAdmin = useCanManage();
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();

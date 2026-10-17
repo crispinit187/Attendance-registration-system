@@ -76,11 +76,11 @@ create table public.accounts (
   email             text,
   full_name         text,
   role              text not null default 'member'
-                    check (role in ('admin','reviewer','registrar','member')),
+                    check (role in ('admin','manager','reviewer','registrar','member')),
   person_id         uuid unique references public.people(id) on delete set null,
   must_set_password boolean not null default false,
   disabled          boolean not null default false,
-  access_scope      text not null default 'all' check (access_scope in ('all', 'selected')),   -- registrars and reviewers: every event and list, or only those granted
+  access_scope      text not null default 'all' check (access_scope in ('all', 'selected')),   -- registrars and reviewers: every event and list, or only those granted (event managers: always only those granted)
   created_by        uuid,
   created_at        timestamptz not null default now()
 );

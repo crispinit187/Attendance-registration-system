@@ -2,16 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { useLookups } from '../../lib/auth';
+import { useAuth, useBase, useLookups } from '../../lib/auth';
 import { errMsg, fmtDateTime } from '../../lib/format';
 import type { EventRow, ListRow } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
+import { TeamPanel } from '../../components/TeamPanel';
 
 const statusKind = (s: string) => (s === 'open' ? 'ok' : s === 'draft' ? 'accent' : s === 'archived' ? 'warn' : '');
 
 export function Lists() {
   const qc = useQueryClient();
   const toast = useToast();
+  const isAdmin = useAuth().account?.role === 'admin';   // event managers work inside their events but cannot create or change events
+  const base = useBase();
   const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const [sp, setSp] = useSearchParams();
@@ -44,11 +47,11 @@ export function Lists() {
         <h1 style={{ margin: 0 }}>Events and lists</h1>
         <div className="row">
           <label className="check small"><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />Show archived</label>
-          <button className="btn primary" onClick={() => setNewEvent(true)}><Icon name="plus" size={16} />New event</button>
+          {isAdmin && <button className="btn primary" onClick={() => setNewEvent(true)}><Icon name="plus" size={16} />New event</button>}
         </div>
       </div>
       {err && <Alert>{errMsg(err)}</Alert>}
-      {!events.data?.length && <div className="card hero muted">No events yet. Create an event (for example “Annual Conference 2026”), then add lists to it.</div>}
+      {!events.data?.length && <div className="card hero muted">{isAdmin ? 'No events yet. Create an event (for example “Annual Conference 2026”), then add lists to it.' : 'No event has been given to you yet. Ask an admin to assign you one.'}</div>}
 
       {events.data?.filter((ev) => showArchived || !ev.archived_at).map((ev) => {
         const ls = byEvent.get(ev.id) ?? [];
@@ -58,10 +61,10 @@ export function Lists() {
             <div className="row between">
               <h2 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge>archived</Badge>}</h2>
               <div className="row">
-                <button className="btn small ghost" onClick={() => setRename(ev)}>Rename</button>
+                {isAdmin && <button className="btn small ghost" onClick={() => setRename(ev)}>Rename</button>}
                 {!ev.archived_at && <button className="btn small" onClick={() => setForm({ event: ev, list: null })}><Icon name="plus" size={14} />Add list</button>}
-                {!ev.archived_at && <button className="btn small" onClick={() => setEvAct({ kind: 'archive', event: ev })}>Archive</button>}
-                {ev.archived_at && (
+                {isAdmin && !ev.archived_at && <button className="btn small" onClick={() => setEvAct({ kind: 'archive', event: ev })}>Archive</button>}
+                {isAdmin && ev.archived_at && (
                   <>
                     <button className="btn small" onClick={async () => { try { await api.unarchiveEvent(ev.id); toast('Event restored from the archive.'); reload(); } catch (e) { toast(errMsg(e)); } }}>Restore</button>
                     <button className="btn small danger" onClick={() => setEvAct({ kind: 'delete', event: ev, lists: allLists.length })}>Delete…</button>
@@ -69,11 +72,12 @@ export function Lists() {
                 )}
               </div>
             </div>
+            <TeamPanel kind="event" targetId={ev.id} canEdit={isAdmin} />
             {ls.length === 0 && <p className="muted small" style={{ margin: 0 }}>No lists in this event yet.</p>}
             {ls.map((l) => (
               <div className="item" key={l.id}>
                 <div className="grow">
-                  <Link to={`/admin/lists/${l.id}`} style={{ fontWeight: 700, textDecoration: 'none' }}>{l.title}</Link>{' '}
+                  <Link to={`${base}/lists/${l.id}`} style={{ fontWeight: 700, textDecoration: 'none' }}>{l.title}</Link>{' '}
                   <Badge kind={statusKind(l.status)}>{l.status}</Badge>
                   <div className="muted small">
                     {l.opened_at ? `Opened ${fmtDateTime(l.opened_at)}` : `Created ${fmtDateTime(l.created_at)}`}

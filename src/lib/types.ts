@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'reviewer' | 'registrar' | 'member';
+export type Role = 'admin' | 'manager' | 'reviewer' | 'registrar' | 'member';
 
 export interface Account {
   id: string; email: string | null; full_name: string | null; role: Role;
@@ -101,3 +101,6 @@ export interface JoinInfo {
 export type JoinResult =
   | { status: 'created' | 'already'; title: string }
   | { status: 'similar'; match: string };
+
+/** Someone who works on an event or sign-up list: its managers first, then the registrars and reviewers given it. */
+export interface TeamMember { grant_id: string; account_id: string; name: string; email: string | null; role: Role; disabled: boolean }

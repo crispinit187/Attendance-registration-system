@@ -99,8 +99,8 @@ export default function App() {
         <Route path="/join/:code" element={<Join />} />
         <Route path="/set-password" element={<Guard><SetPassword /></Guard>} />
         <Route path="/details" element={<Guard roles={['member']}><Details /></Guard>} />
-        <Route path="/venue/:listId" element={<Guard roles={['admin', 'registrar']}><VenueScreen /></Guard>} />
-        <Route path="/signup-venue/:listId" element={<Guard roles={['admin', 'registrar']}><SignupVenue /></Guard>} />
+        <Route path="/venue/:listId" element={<Guard roles={['admin', 'manager', 'registrar']}><VenueScreen /></Guard>} />
+        <Route path="/signup-venue/:listId" element={<Guard roles={['admin', 'manager', 'registrar']}><SignupVenue /></Guard>} />
 
         <Route element={<Guard roles={['member']}><Shell /></Guard>}>
           <Route path="/app" element={<Dashboard />} />
@@ -112,9 +112,14 @@ export default function App() {
         <Route element={<Guard roles={['registrar']}><Shell /></Guard>}>
           <Route path="/registrar" element={<Registrar />} />
         </Route>
-        <Route element={<Guard roles={['admin', 'registrar']}><Shell /></Guard>}>
+        <Route element={<Guard roles={['admin', 'manager', 'registrar']}><Shell /></Guard>}>
           <Route path="/signups" element={<SignupLists />} />
           <Route path="/signups/:id" element={<SignupDetail />} />
+        </Route>
+        <Route element={<Guard roles={['manager']}><Shell /></Guard>}>
+          <Route path="/manage/lists" element={<Lists />} />
+          <Route path="/manage/lists/:id" element={<ListDetail />} />
+          <Route path="/manage/exports" element={<Exports />} />
         </Route>
         <Route element={<Guard roles={['reviewer']}><Shell /></Guard>}>
           <Route path="/review" element={<Reviewer />} />

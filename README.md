@@ -19,7 +19,7 @@ In Supabase open **SQL Editor → New query**. Paste the whole contents of each 
 2. `supabase/sql/02_functions.sql`
 3. `supabase/sql/03_security_and_seed.sql`
 
-Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`, `10_realtime.sql`, `11_access_scope.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
+Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`, `10_realtime.sql`, `11_access_scope.sql`, `12_event_manager.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
 
 ## 3. Login settings (Authentication)
 - **URL Configuration**: Site URL = your final website address **without a trailing slash**, e.g. `https://YOURNAME.github.io/attendance-registration`. Add the same address (and `http://localhost:5173` for local testing) to **Redirect URLs**.
@@ -94,3 +94,13 @@ Registrars and reviewers each have an access type, set by the admin on the Accou
 - **Only what I select**: just the events, lists and, for registrars, sign-up lists the admin adds. Access can be added or removed at any time.
 
 Several attendance lists and several sign-up lists can be open at the same time. If you run an older database, run `11_access_scope.sql` once and redeploy the function: `npx supabase functions deploy admin-create-user`.
+
+## Event managers
+
+An event manager is a fourth kind of staff account, for people who run some events and sign-up lists. Only an admin creates them and chooses what each one can work with (Accounts, the ⋯ menu on their row, Access and permissions: whole events and sign-up lists).
+
+Inside what they were given, an event manager can create and edit lists, open and close registration, archive and delete lists, create and manage sign-up lists, mark and remove attendance, add people, see contact numbers and export to Excel or PDF. They cannot create events, and they have no Accounts, People, Setup, Districts or Audit log pages. They cannot give anyone access.
+
+Each event and sign-up list shows "Managed by" with its event manager, plus the registrars and reviewers who were given it. Only an admin can change that team (Manage team on the event or sign-up list).
+
+If you run an older database, run `12_event_manager.sql` once and redeploy the function: `npx supabase functions deploy admin-create-user`.

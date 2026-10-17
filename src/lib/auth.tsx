@@ -72,6 +72,7 @@ export function needsDetails(account: Account | null, person: Person | null) {
 export function homeFor(role: string | undefined): string {
   switch (role) {
     case 'admin': return '/admin';
+    case 'manager': return '/manage/lists';
     case 'reviewer': return '/review';
     case 'registrar': return '/registrar';
     default: return '/app';
@@ -86,4 +87,9 @@ export function useLookups() {
     areas: areas.data ?? [], titles: titles.data ?? [], voices: voices.data ?? [],
     ready: !!(areas.data && titles.data && voices.data),
   };
+}
+
+/** Where the shared admin pages live for this person: admins use /admin, event managers /manage. */
+export function useBase() {
+  return useAuth().account?.role === 'manager' ? '/manage' : '/admin';
 }

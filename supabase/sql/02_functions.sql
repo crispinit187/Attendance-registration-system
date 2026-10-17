@@ -28,8 +28,8 @@ language sql stable security definer set search_path = public as $$
     select 1 from public.accounts a
     where a.id = auth.uid() and not a.disabled
       and (a.role = 'admin'
-           or (a.role in ('registrar', 'reviewer')
-               and (a.access_scope = 'all'
+           or (a.role in ('registrar', 'reviewer', 'manager')
+               and ((a.access_scope = 'all' and a.role <> 'manager')
                     or exists (select 1 from public.reviewer_grants g
                                where g.account_id = a.id
                                  and (g.list_id = p_list
@@ -43,8 +43,8 @@ language sql stable security definer set search_path = public as $$
     select 1 from public.accounts a
     where a.id = auth.uid() and not a.disabled
       and (a.role = 'admin'
-           or (a.role in ('registrar', 'reviewer')
-               and (a.access_scope = 'all'
+           or (a.role in ('registrar', 'reviewer', 'manager')
+               and ((a.access_scope = 'all' and a.role <> 'manager')
                     or exists (select 1 from public.reviewer_grants g
                                where g.account_id = a.id
                                  and (g.event_id = p_event
@@ -58,8 +58,8 @@ language sql stable security definer set search_path = public as $$
     select 1 from public.accounts a
     where a.id = auth.uid() and not a.disabled
       and (a.role = 'admin'
-           or (a.role = 'registrar'
-               and (a.access_scope = 'all'
+           or (a.role in ('registrar', 'manager')
+               and ((a.access_scope = 'all' and a.role <> 'manager')
                     or exists (select 1 from public.reviewer_grants g
                                where g.account_id = a.id and g.signup_list_id = p_signup))))
   )
@@ -67,12 +67,12 @@ $$;
 
 create function public.can_review_list(p_list uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.app_role() = 'reviewer' and public.list_access(p_list)
+  select public.app_role() in ('reviewer', 'manager') and public.list_access(p_list)
 $$;
 
 create function public.can_review_event(p_event uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.app_role() = 'reviewer' and public.event_access(p_event)
+  select public.app_role() in ('reviewer', 'manager') and public.event_access(p_event)
 $$;
 
 create function public.need_role(p_roles text[]) returns text
@@ -365,7 +365,7 @@ begin
         'id', l.id, 'title', l.title, 'event_name', e.name,
         'location_check', l.location_check, 'rotating_qr', l.rotating_qr,
         'radius_m', l.radius_m, 'allowed_area_ids', l.allowed_area_ids,
-        'present_count', case when r in ('admin', 'registrar')
+        'present_count', case when r in ('admin', 'registrar', 'manager')
                               then (select count(*)::int from public.attendance at where at.list_id = l.id and not at.removed) end,
         'opened_at', l.opened_at) order by l.opened_at desc)
       from public.lists l join public.events e on e.id = l.event_id
@@ -467,11 +467,11 @@ create function public.mark_attendance_manual(p_list uuid, p_person uuid) return
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; l public.lists%rowtype; pr public.people%rowtype; method text;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('mark_manual', 120, 60);
   select * into l from public.lists where id = p_list;
   if not found or l.status <> 'open' then raise exception 'Registration is closed.'; end if;
-  if r = 'registrar' and not public.list_access(p_list) then raise exception 'You do not have access to this list.'; end if;
+  if r in ('registrar', 'manager') and not public.list_access(p_list) then raise exception 'You do not have access to this list.'; end if;
   select * into pr from public.people where id = p_person and not archived;
   if not found then raise exception 'Person not found.'; end if;
   if r = 'registrar' and cardinality(l.allowed_area_ids) > 0
@@ -510,7 +510,7 @@ create function public.remove_attendance(p_att uuid, p_reason text) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; a public.attendance%rowtype; l public.lists%rowtype;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('remove', 60, 60);
   if p_reason is null or char_length(btrim(p_reason)) < 3 then
     raise exception 'Please give a reason for removing this attendee.';
@@ -519,7 +519,7 @@ begin
   if not found then raise exception 'Attendance record not found.'; end if;
   if a.removed then return; end if;
   select * into l from public.lists where id = a.list_id;
-  if r = 'registrar' and not public.list_access(a.list_id) then raise exception 'You do not have access to this list.'; end if;
+  if r in ('registrar', 'manager') and not public.list_access(a.list_id) then raise exception 'You do not have access to this list.'; end if;
   if l.status = 'archived' then raise exception 'This list is archived.'; end if;
   update public.attendance
      set removed = true, removed_by = auth.uid(), removed_at = now(), removed_reason = btrim(p_reason)
@@ -533,12 +533,12 @@ create function public.restore_attendance(p_att uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; a public.attendance%rowtype; l public.lists%rowtype;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into a from public.attendance where id = p_att;
   if not found then raise exception 'Attendance record not found.'; end if;
   if not a.removed then return; end if;
   select * into l from public.lists where id = a.list_id;
-  if r = 'registrar' and not public.list_access(a.list_id) then raise exception 'You do not have access to this list.'; end if;
+  if r in ('registrar', 'manager') and not public.list_access(a.list_id) then raise exception 'You do not have access to this list.'; end if;
   if l.status = 'archived' then raise exception 'This list is archived.'; end if;
   update public.attendance
      set removed = false, removed_by = null, removed_at = null, removed_reason = null
@@ -553,12 +553,13 @@ create function public.list_present(p_list uuid, p_include_removed boolean defau
 language plpgsql stable security definer set search_path = public, extensions as $$
 declare r text; l public.lists%rowtype; res jsonb;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into l from public.lists where id = p_list;
   if not found then raise exception 'List not found.'; end if;
   if r = 'registrar' and (l.status <> 'open' or not public.list_access(p_list)) then
     raise exception 'You can only see an open list that you have access to.';
   end if;
+  if r = 'manager' and not public.list_access(p_list) then raise exception 'You do not have access to this list.'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
       'att_id', at.id,
       'person_id', at.person_id,
@@ -585,7 +586,7 @@ create function public.search_people(p_q text, p_list uuid default null) returns
 language plpgsql stable security definer set search_path = public, extensions as $$
 declare q text := btrim(coalesce(p_q, '')); res jsonb;
 begin
-  perform public.need_role(array['admin', 'registrar']);
+  perform public.need_role(array['admin', 'registrar', 'manager']);
   if char_length(q) < 2 then return '[]'::jsonb; end if;
   q := left(q, 60);
   select coalesce(jsonb_agg(public._person_card(x.id, p_list) order by x.score desc, x.full_name), '[]'::jsonb)
@@ -609,7 +610,7 @@ create function public.create_person(
 language plpgsql security definer set search_path = public, extensions as $$
 declare nm text; spec text; dg uuid; c text; pid uuid; sim_matches jsonb;
 begin
-  perform public.need_role(array['admin', 'registrar']);
+  perform public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('create_person', 30, 60);
   nm := btrim(p_full_name);
   if char_length(nm) < 2 then raise exception 'Please enter the full name.'; end if;
@@ -646,10 +647,10 @@ create function public.update_person(
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; pr public.people%rowtype; spec text; dg uuid; c text; nm text;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into pr from public.people where id = p_id;
   if not found then raise exception 'Person not found.'; end if;
-  if r = 'registrar' and pr.created_by is distinct from auth.uid() then
+  if r in ('registrar', 'manager') and pr.created_by is distinct from auth.uid() then
     raise exception 'You can only edit people you added.';
   end if;
   nm := btrim(p_full_name);
@@ -669,10 +670,10 @@ create function public.archive_person(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; pr public.people%rowtype;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into pr from public.people where id = p_id;
   if not found then raise exception 'Person not found.'; end if;
-  if r = 'registrar' and pr.created_by is distinct from auth.uid() then
+  if r in ('registrar', 'manager') and pr.created_by is distinct from auth.uid() then
     raise exception 'You can only archive people you added.';
   end if;
   update public.people set archived = true, updated_at = now() where id = p_id;
@@ -697,10 +698,10 @@ create function public.delete_person(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; pr public.people%rowtype;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into pr from public.people where id = p_id;
   if not found then raise exception 'Person not found.'; end if;
-  if r = 'registrar' and pr.created_by is distinct from auth.uid() then
+  if r in ('registrar', 'manager') and pr.created_by is distinct from auth.uid() then
     raise exception 'You can only delete people you added.';
   end if;
   if exists (select 1 from public.attendance where person_id = p_id) then
@@ -774,9 +775,9 @@ create function public.save_list(
   p_rotating boolean, p_rotation int
 ) returns uuid
 language plpgsql security definer set search_path = public, extensions as $$
-declare lid uuid; cur public.lists%rowtype; allowed uuid[] := coalesce(p_allowed, '{}');
+declare r text; lid uuid; cur public.lists%rowtype; allowed uuid[] := coalesce(p_allowed, '{}');
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
   if char_length(btrim(coalesce(p_title, ''))) < 2 then raise exception 'Please enter a list title.'; end if;
   if (select count(*) from public.areas where id = any (allowed)) <> cardinality(allowed) then
     raise exception 'One of the chosen areas does not exist.';
@@ -786,6 +787,7 @@ begin
   end if;
   if p_id is null then
     if not exists (select 1 from public.events where id = p_event) then raise exception 'Event not found.'; end if;
+    if r = 'manager' and not public.event_access(p_event) then raise exception 'You do not have access to this event.'; end if;
     if exists (select 1 from public.events where id = p_event and archived_at is not null) then
       raise exception 'This event is archived. Restore it before adding lists.';
     end if;
@@ -798,6 +800,7 @@ begin
   else
     select * into cur from public.lists where id = p_id;
     if not found then raise exception 'List not found.'; end if;
+    if r = 'manager' and not public.list_access(p_id) then raise exception 'You do not have access to this list.'; end if;
     if cur.status = 'archived' then raise exception 'Restore this list from the archive before editing it.'; end if;
     update public.lists
        set title = btrim(p_title), allowed_area_ids = allowed, location_check = p_location,
@@ -811,9 +814,10 @@ end $$;
 
 create function public.open_list(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.lists%rowtype; o public.lists%rowtype;
+declare r text; l public.lists%rowtype; o public.lists%rowtype;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.list_access(p_id) then raise exception 'You do not have access to this list.'; end if;
   select * into l from public.lists where id = p_id for update;
   if not found then raise exception 'List not found.'; end if;
   if l.status = 'open' then return; end if;
@@ -827,9 +831,10 @@ end $$;
 
 create function public.close_list(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.lists%rowtype;
+declare r text; l public.lists%rowtype;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.list_access(p_id) then raise exception 'You do not have access to this list.'; end if;
   select * into l from public.lists where id = p_id for update;
   if not found then raise exception 'List not found.'; end if;
   if l.status <> 'open' then return; end if;
@@ -839,9 +844,10 @@ end $$;
 
 create function public.archive_list(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.lists%rowtype;
+declare r text; l public.lists%rowtype;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.list_access(p_id) then raise exception 'You do not have access to this list.'; end if;
   select * into l from public.lists where id = p_id for update;
   if not found then raise exception 'List not found.'; end if;
   if l.status = 'open' then raise exception 'Close this list before archiving it.'; end if;
@@ -852,9 +858,10 @@ end $$;
 
 create function public.unarchive_list(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.lists%rowtype;
+declare r text; l public.lists%rowtype;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.list_access(p_id) then raise exception 'You do not have access to this list.'; end if;
   select * into l from public.lists where id = p_id for update;
   if not found then raise exception 'List not found.'; end if;
   if l.status <> 'archived' then return; end if;
@@ -867,9 +874,10 @@ end $$;
 -- Permanent. Only an archived list, and only when its title is typed exactly.
 create function public.delete_list(p_id uuid, p_confirm text) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.lists%rowtype; n int; ev text;
+declare r text; l public.lists%rowtype; n int; ev text;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.list_access(p_id) then raise exception 'You do not have access to this list.'; end if;
   select * into l from public.lists where id = p_id for update;
   if not found then raise exception 'List not found.'; end if;
   if l.status <> 'archived' then raise exception 'Archive this list before deleting it.'; end if;
@@ -890,11 +898,11 @@ create function public.get_qr_payload(p_list uuid) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; l public.lists%rowtype; s public.list_secrets%rowtype; w bigint; secs int;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('qr', 120, 60);
   select * into l from public.lists where id = p_list;
   if not found then raise exception 'List not found.'; end if;
-  if r = 'registrar' and not public.list_access(p_list) then raise exception 'You do not have access to this list.'; end if;
+  if r in ('registrar', 'manager') and not public.list_access(p_list) then raise exception 'You do not have access to this list.'; end if;
   select * into s from public.list_secrets where list_id = p_list;
   if l.rotating_qr then
     if l.status <> 'open' then raise exception 'This list is not open.'; end if;
@@ -904,7 +912,7 @@ begin
                               'seconds_left', secs, 'rotation_seconds', l.rotation_seconds,
                               'list_id', l.id, 'title', l.title);
   end if;
-  if r <> 'admin' then
+  if r not in ('admin', 'manager') then
     raise exception 'Rotating QR is off for this list. Only admins can show the printable QR code.';
   end if;
   return jsonb_build_object('mode', 'static', 'token', s.qr_token, 'list_id', l.id, 'title', l.title);
@@ -969,11 +977,12 @@ declare a public.accounts%rowtype;
 begin
   perform public.need_role(array['admin']);
   select * into a from public.accounts where id = p_account;
-  if not found or a.role not in ('registrar', 'reviewer') then raise exception 'Choose a registrar or reviewer account.'; end if;
+  if not found or a.role not in ('registrar', 'reviewer', 'manager') then raise exception 'Choose a registrar, reviewer or event manager account.'; end if;
   if (p_event is not null)::int + (p_list is not null)::int + (p_signup is not null)::int <> 1 then
     raise exception 'Choose one event, list or sign-up list.';
   end if;
-  if p_signup is not null and a.role <> 'registrar' then raise exception 'Only registrars work with sign-up lists.'; end if;
+  if p_signup is not null and a.role not in ('registrar', 'manager') then raise exception 'Only registrars and event managers work with sign-up lists.'; end if;
+  if p_list is not null and a.role = 'manager' then raise exception 'Give an event manager a whole event or a sign-up list.'; end if;
   insert into public.reviewer_grants (account_id, event_id, list_id, signup_list_id, created_by)
   values (p_account, p_event, p_list, p_signup, auth.uid())
   on conflict do nothing;
@@ -1001,6 +1010,7 @@ begin
   perform public.need_role(array['admin']);
   if p_scope not in ('all', 'selected') then raise exception 'Unknown access type.'; end if;
   select * into a from public.accounts where id = p_id;
+  if found and a.role = 'manager' then raise exception 'An event manager always works only with what you select.'; end if;
   if not found or a.role not in ('registrar', 'reviewer') then raise exception 'Only registrars and reviewers have this setting.'; end if;
   update public.accounts set access_scope = p_scope where id = p_id;
   perform public.log_action('account.scope', 'account', p_id::text,
@@ -1046,13 +1056,14 @@ returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; ok boolean; title text;
 begin
-  r := public.need_role(array['admin', 'reviewer']);
+  r := public.need_role(array['admin', 'reviewer', 'manager']);
   if p_scope not in ('list', 'event', 'signup') then raise exception 'Unknown export scope.'; end if;
-  if p_scope = 'signup' and r <> 'admin' then
+  if p_scope = 'signup' and r not in ('admin', 'manager') then
     raise exception 'You do not have permission to do that.' using errcode = '42501';
   end if;
-  if r = 'reviewer' then
+  if r in ('reviewer', 'manager') then
     ok := case when p_scope = 'list' then public.can_review_list(p_target)
+                when p_scope = 'signup' then public.signup_access(p_target)
                 else public.can_review_event(p_target) end;
     if not ok then raise exception 'You do not have access to that.' using errcode = '42501'; end if;
   end if;
@@ -1089,8 +1100,8 @@ create function public.event_breakdown(p_event uuid) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare r text; res jsonb;
 begin
-  r := public.need_role(array['admin', 'reviewer']);
-  if r = 'reviewer' and not public.can_review_event(p_event) then
+  r := public.need_role(array['admin', 'reviewer', 'manager']);
+  if r in ('reviewer', 'manager') and not public.can_review_event(p_event) then
     raise exception 'You do not have access to that.' using errcode = '42501';
   end if;
   select coalesce(jsonb_agg(to_jsonb(x) order by x.sort_at), '[]'::jsonb) into res
@@ -1112,6 +1123,46 @@ begin
        and (r = 'admin' or public.can_review_list(l.id))
   ) x;
   return res;
+end $$;
+
+-- Who works on an event or a sign-up list: its event managers first, then registrars and reviewers
+-- who were given it. Admins see everything; a manager sees names only, for what they manage.
+create function public.event_team(p_event uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare r text;
+begin
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.event_access(p_event) then
+    raise exception 'You do not have access to that.' using errcode = '42501';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'grant_id', g.id, 'account_id', a.id,
+             'name', coalesce(nullif(a.full_name, ''), a.email),
+             'email', case when r = 'admin' then a.email else null end,
+             'role', a.role, 'disabled', a.disabled)
+           order by (a.role = 'manager') desc, coalesce(nullif(a.full_name, ''), a.email))
+      from public.reviewer_grants g join public.accounts a on a.id = g.account_id
+     where g.event_id = p_event), '[]'::jsonb);
+end $$;
+
+create function public.signup_team(p_signup uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare r text;
+begin
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.signup_access(p_signup) then
+    raise exception 'You do not have access to that.' using errcode = '42501';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'grant_id', g.id, 'account_id', a.id,
+             'name', coalesce(nullif(a.full_name, ''), a.email),
+             'email', case when r = 'admin' then a.email else null end,
+             'role', a.role, 'disabled', a.disabled)
+           order by (a.role = 'manager') desc, coalesce(nullif(a.full_name, ''), a.email))
+      from public.reviewer_grants g join public.accounts a on a.id = g.account_id
+     where g.signup_list_id = p_signup), '[]'::jsonb);
 end $$;
 
 create function public.district_overview() returns jsonb
@@ -1137,10 +1188,10 @@ declare r text := coalesce(new.raw_app_meta_data->>'role', 'member');
 begin
   -- Visitors of the public sign-up page are anonymous sessions: they never get an account.
   if coalesce(new.is_anonymous, false) then return new; end if;
-  if r not in ('admin', 'reviewer', 'registrar', 'member') then r := 'member'; end if;
+  if r not in ('admin', 'manager', 'reviewer', 'registrar', 'member') then r := 'member'; end if;
   insert into public.accounts (id, email, full_name, role, access_scope)
   values (new.id, new.email, nullif(btrim(coalesce(new.raw_user_meta_data->>'full_name', '')), ''), r,
-          case when r = 'reviewer' then 'selected' else 'all' end)
+          case when r in ('reviewer', 'manager') then 'selected' else 'all' end)
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -1418,7 +1469,7 @@ create function public.signup_lists_overview() returns jsonb
 language plpgsql stable security definer set search_path = public, extensions as $$
 declare r text;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   return coalesce((
     select jsonb_agg(jsonb_build_object(
              'id', l.id, 'title', l.title, 'status', l.status, 'opened_at', l.opened_at,
@@ -1426,19 +1477,22 @@ begin
              'entries', (select count(*) from public.signup_entries e where e.list_id = l.id and not e.removed))
            order by (l.status = 'open') desc, l.created_at desc)
       from public.signup_lists l
-     where r = 'admin' or (l.status = 'open' and public.signup_access(l.id))), '[]'::jsonb);
+     where r = 'admin'
+        or (r = 'manager' and public.signup_access(l.id))
+        or (r = 'registrar' and l.status = 'open' and public.signup_access(l.id))), '[]'::jsonb);
 end $$;
 
 create function public.signup_get(p_id uuid) returns jsonb
 language plpgsql stable security definer set search_path = public, extensions as $$
 declare r text; l public.signup_lists%rowtype;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into l from public.signup_lists where id = p_id;
   if not found then raise exception 'Sign-up list not found.'; end if;
   if r = 'registrar' and (l.status <> 'open' or not public.signup_access(l.id)) then
     raise exception 'You can only see an open sign-up list that you have access to.';
   end if;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   return jsonb_build_object(
     'id', l.id, 'title', l.title, 'status', l.status, 'code', l.code,
     'voice_part_ids', l.voice_part_ids, 'allowed_area_ids', l.allowed_area_ids,
@@ -1453,13 +1507,14 @@ create function public.signup_qr_payload(p_id uuid) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; l public.signup_lists%rowtype; w bigint; secs int;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('qr', 120, 60);
   select * into l from public.signup_lists where id = p_id;
   if not found then raise exception 'Sign-up list not found.'; end if;
   if r = 'registrar' and (l.status <> 'open' or not public.signup_access(l.id)) then
     raise exception 'You can only see an open sign-up list that you have access to.';
   end if;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   if not l.rotating_qr then raise exception 'This sign-up list uses a fixed QR code, not a rotating one.'; end if;
   if l.status <> 'open' then raise exception 'Sign-ups are closed. Open them to show the QR code.'; end if;
   w := floor(extract(epoch from now()) / l.rotation_seconds)::bigint;
@@ -1476,9 +1531,9 @@ create function public.signup_save(
   p_rotating boolean default false, p_rotation int default 30
 ) returns uuid
 language plpgsql security definer set search_path = public, extensions as $$
-declare lid uuid; vs uuid[] := coalesce(p_voices, '{}'); ar uuid[] := coalesce(p_areas, '{}');
+declare r text; lid uuid; vs uuid[] := coalesce(p_voices, '{}'); ar uuid[] := coalesce(p_areas, '{}');
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
   if char_length(btrim(coalesce(p_title, ''))) < 2 then raise exception 'Please enter a title.'; end if;
   if (select count(*) from public.voice_parts where id = any (vs)) <> cardinality(vs) then
     raise exception 'One of the chosen voice parts does not exist.';
@@ -1499,7 +1554,12 @@ begin
             coalesce(p_rotating, false), coalesce(p_rotation, 30), auth.uid())
     returning id into lid;
     perform public.log_action('signup.create', 'signup', lid::text, jsonb_build_object('title', btrim(p_title)));
+    -- A manager who creates a sign-up list can work with it from then on
+    if r = 'manager' then
+      insert into public.reviewer_grants (account_id, signup_list_id, created_by) values (auth.uid(), lid, auth.uid()) on conflict do nothing;
+    end if;
   else
+    if r = 'manager' and not public.signup_access(p_id) then raise exception 'You do not have access to this sign-up list.'; end if;
     update public.signup_lists
        set title = btrim(p_title), voice_part_ids = vs, allowed_area_ids = ar,
            location_check = p_location, venue_lat = p_lat, venue_lng = p_lng,
@@ -1515,9 +1575,10 @@ end $$;
 -- Open or close sign-ups (admins only). Several sign-up lists can be open at once.
 create function public.signup_set_open(p_id uuid, p_open boolean) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.signup_lists%rowtype; o public.signup_lists%rowtype;
+declare r text; l public.signup_lists%rowtype; o public.signup_lists%rowtype;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.signup_access(p_id) then raise exception 'You do not have access to this sign-up list.'; end if;
   select * into l from public.signup_lists where id = p_id for update;
   if not found then raise exception 'Sign-up list not found.'; end if;
   if p_open then
@@ -1534,9 +1595,10 @@ end $$;
 -- New link: the old link and every printed or shared QR code stop working at once
 create function public.signup_new_link(p_id uuid) returns text
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.signup_lists%rowtype; c text;
+declare r text; l public.signup_lists%rowtype; c text;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.signup_access(p_id) then raise exception 'You do not have access to this sign-up list.'; end if;
   select * into l from public.signup_lists where id = p_id for update;
   if not found then raise exception 'Sign-up list not found.'; end if;
   c := encode(extensions.gen_random_bytes(12), 'hex');
@@ -1548,9 +1610,10 @@ end $$;
 -- Permanent. Only a closed list, and only when its title is typed exactly.
 create function public.signup_delete(p_id uuid, p_confirm text) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare l public.signup_lists%rowtype; n int;
+declare r text; l public.signup_lists%rowtype; n int;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
+  if r = 'manager' and not public.signup_access(p_id) then raise exception 'You do not have access to this sign-up list.'; end if;
   select * into l from public.signup_lists where id = p_id for update;
   if not found then raise exception 'Sign-up list not found.'; end if;
   if l.status = 'open' then raise exception 'Close sign-ups before deleting this list.'; end if;
@@ -1570,12 +1633,13 @@ create function public.signup_entries(p_list uuid, p_include_removed boolean def
 language plpgsql stable security definer set search_path = public, extensions as $$
 declare r text; l public.signup_lists%rowtype; res jsonb;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into l from public.signup_lists where id = p_list;
   if not found then raise exception 'Sign-up list not found.'; end if;
   if r = 'registrar' and (l.status <> 'open' or not public.signup_access(l.id)) then
     raise exception 'You can only see an open sign-up list that you have access to.';
   end if;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', e.id,
       'display_name', public.display_name(t.name, e.title_specify, e.full_name),
@@ -1583,15 +1647,15 @@ begin
       'area_id', e.area_id, 'area', a.name,
       'district', g.name,
       'voice_part_id', e.voice_part_id, 'voice_part', v.name,
-      'contact', case when r = 'admin' then e.contact else null end,
+      'contact', case when r in ('admin', 'manager') then e.contact else null end,
       'source', e.source, 'added_by_name', e.added_by_name, 'forced', e.forced,
       'created_at', e.created_at,
       'removed', e.removed, 'removed_reason', e.removed_reason,
       'person_id', e.person_id,
       'person_name', (select public.display_name(pt.name, p.title_specify, p.full_name)
                         from public.people p left join public.titles pt on pt.id = p.title_id
-                       where p.id = e.person_id and r = 'admin'),
-      'can_edit', (r = 'admin' or coalesce(e.added_by = auth.uid(), false))) order by e.created_at desc), '[]'::jsonb)
+                       where p.id = e.person_id and r in ('admin', 'manager')),
+      'can_edit', (r in ('admin', 'manager') or coalesce(e.added_by = auth.uid(), false))) order by e.created_at desc), '[]'::jsonb)
     into res
     from public.signup_entries e
     left join public.titles t on t.id = e.title_id
@@ -1646,13 +1710,14 @@ declare
   n_new int := 0; n_added int := 0; n_similar int := 0; n_already int := 0; n_invalid int := 0;
   forced boolean;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('signup_paste', 20, 60);
   select * into l from public.signup_lists where id = p_list;
   if not found then raise exception 'Sign-up list not found.'; end if;
   if r = 'registrar' and (l.status <> 'open' or not public.signup_access(l.id)) then
     raise exception 'You can only add to an open sign-up list that you have access to.';
   end if;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) = 0 then
     raise exception 'There is nothing to add.';
   end if;
@@ -1723,13 +1788,14 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare
   r text; e public.signup_entries%rowtype; l public.signup_lists%rowtype; v jsonb; chk jsonb;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   select * into e from public.signup_entries where id = p_id;
   if not found then raise exception 'Entry not found.'; end if;
   select * into l from public.signup_lists where id = e.list_id;
   if r = 'registrar' and (e.added_by is distinct from auth.uid() or l.status <> 'open' or not public.signup_access(l.id)) then
     raise exception 'You can only edit entries you added.';
   end if;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   if e.removed then raise exception 'This entry was removed.'; end if;
   v := public._signup_row(l, jsonb_build_object(
          'title_id', p_title_id, 'title_specify', p_title_specify, 'name', p_full_name,
@@ -1752,7 +1818,7 @@ create function public.signup_remove_entry(p_id uuid, p_reason text) returns voi
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text; e public.signup_entries%rowtype; l public.signup_lists%rowtype;
 begin
-  r := public.need_role(array['admin', 'registrar']);
+  r := public.need_role(array['admin', 'registrar', 'manager']);
   perform public.rate_check('signup_remove', 60, 60);
   if p_reason is null or char_length(btrim(p_reason)) < 3 then
     raise exception 'Please give a reason for removing this entry.';
@@ -1763,6 +1829,7 @@ begin
   if r = 'registrar' and (e.added_by is distinct from auth.uid() or l.status <> 'open' or not public.signup_access(l.id)) then
     raise exception 'You can only remove entries you added.';
   end if;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   if e.removed then return; end if;
   update public.signup_entries
      set removed = true, removed_by = auth.uid(), removed_at = now(), removed_reason = btrim(p_reason)
@@ -1773,13 +1840,14 @@ end $$;
 
 create function public.signup_restore_entry(p_id uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
-declare e public.signup_entries%rowtype; l public.signup_lists%rowtype;
+declare r text; e public.signup_entries%rowtype; l public.signup_lists%rowtype;
 begin
-  perform public.need_role(array['admin']);
+  r := public.need_role(array['admin', 'manager']);
   select * into e from public.signup_entries where id = p_id;
   if not found then raise exception 'Entry not found.'; end if;
   if not e.removed then return; end if;
   select * into l from public.signup_lists where id = e.list_id;
+  if r = 'manager' and not public.signup_access(l.id) then raise exception 'You do not have access to this sign-up list.'; end if;
   update public.signup_entries
      set removed = false, removed_by = null, removed_at = null, removed_reason = null
    where id = e.id;

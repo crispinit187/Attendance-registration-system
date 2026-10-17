@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import type {
   Account, AccountStatus, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
   Lookup, OpenList, PasteResult, PasteRowIn, Person, PersonCard, PresentRow, ProfileInput, QrPayload,
-  SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch, SignupQrPayload,
+  SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch, SignupQrPayload, TeamMember,
 } from './types';
 
 async function fn(action: string, id: string) {
@@ -117,6 +117,8 @@ export const api = {
   grant: (account: string, event: string | null, list: string | null, signup: string | null = null) => rpc('grant_access', { p_account: account, p_event: event, p_list: list, p_signup: signup }),
   setScope: (id: string, scope: 'all' | 'selected') => rpc('set_account_scope', { p_id: id, p_scope: scope }),
   revokeGrant: (id: string) => rpc('revoke_grant', { p_id: id }),
+  eventTeam: (event: string) => rpc<TeamMember[]>('event_team', { p_event: event }),
+  signupTeam: (signup: string) => rpc<TeamMember[]>('signup_team', { p_signup: signup }),
   accountStatuses: () => rpc<AccountStatus[]>('account_statuses'),
   verifyAccount: (id: string) => fn('verify', id),
   resendInvite: (id: string) => fn('resend', id),

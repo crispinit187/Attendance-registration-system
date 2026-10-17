@@ -49,7 +49,7 @@ begin
          'signup_public_info', 'signup_submit', 'signup_lists_overview', 'signup_get',
          'signup_save', 'signup_set_open', 'signup_new_link', 'signup_delete',
          'signup_entries', 'signup_paste', 'signup_update_entry', 'signup_remove_entry',
-         'signup_restore_entry', 'signup_to_person', 'signup_merge_into',
+         'signup_restore_entry', 'signup_to_person', 'signup_merge_into', 'event_team', 'signup_team',
          'delete_event', 'archive_event', 'unarchive_event', 'signup_delete_entry', 'signup_qr_payload'])
   loop
     execute format('grant execute on function %s to authenticated', f.sig);
@@ -113,10 +113,11 @@ create policy lists_select on public.lists for select to authenticated
 create policy list_secrets_select on public.list_secrets for select to authenticated
   using (public.app_role() = 'admin');
 
--- Attendance: admins all; reviewers granted lists (not removed); members their own
+-- Attendance: admins all; event managers their lists (removed ones too, so they can restore); reviewers granted lists (not removed); members their own
 create policy attendance_select on public.attendance for select to authenticated
   using (
     public.app_role() = 'admin'
+    or (public.app_role() = 'manager' and public.can_review_list(list_id))
     or (not removed and public.can_review_list(list_id))
     or (not removed and person_id = public.my_person_id())
   );

@@ -311,3 +311,6 @@ body:has(.shell:not(.admin) .bottomnav) .page { padding-bottom: 16px; }   /* the
 .menu-item small { font-size: 12px; font-weight: 400; color: var(--muted); }
 .menu-item.danger { color: var(--danger); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Who works on an event or sign-up list */
+.teambox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2, transparent); }
