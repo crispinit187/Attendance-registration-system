@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { errMsg, fmtDate } from '../../lib/format';
-import type { Account, AccountState, AccountStatus } from '../../lib/types';
+import type { Account, AccountState, AccountStatus, Grant } from '../../lib/types';
 import { ActionMenu } from '../../components/ActionMenu';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 
@@ -46,6 +46,7 @@ export function Accounts() {
   const stMap = useMemo(() => new Map((statuses.data ?? []).map((s) => [s.id, s])), [statuses.data]);
   const [linking, setLinking] = useState<Account | null>(null);
   const [granting, setGranting] = useState<Account | null>(null);
+  const [changing, setChanging] = useState<Account | null>(null);
   const [toggle, setToggle] = useState<Account | null>(null);
   const reload = () => { void qc.invalidateQueries({ queryKey: ['accounts'] }); void qc.invalidateQueries({ queryKey: ['account-statuses'] }); void qc.invalidateQueries({ queryKey: ['grants'] }); };
   const pname = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.full_name])), [people.data]);
@@ -116,6 +117,7 @@ export function Accounts() {
                       return (
                         <ActionMenu label={`Actions for ${a.full_name || a.email}`} items={[
                           { label: 'Access and permissions…', hint: a.access_scope === 'all' && a.role !== 'manager' ? 'Has access to everything' : 'Only what you choose', hidden: !(a.role === 'registrar' || a.role === 'reviewer' || a.role === 'manager'), onClick: () => setGranting(a) },
+                          { label: 'Change role…', hint: `Now ${ROLE_LABEL[a.role] ?? a.role}`, hidden: self, onClick: () => setChanging(a) },
                           { label: 'Link to a person…', hidden: !!a.person_id || a.role === 'reviewer' || a.role === 'manager', onClick: () => setLinking(a) },
                           { label: 'Verify now…', hint: 'Skip the email link', hidden: k !== 'pending', onClick: () => setVerifying(a) },
                           { label: 'Resend invite', hidden: !(k === 'pending' && a.must_set_password), onClick: async () => { try { await api.resendInvite(a.id); toast('Invitation sent again.'); } catch (e) { toast(errMsg(e)); } } },
@@ -147,6 +149,7 @@ export function Accounts() {
         onClose={() => setRemoving(null)}
         onConfirm={async () => { await api.deleteAccount(removing.id); toast('Account deleted.'); reload(); void qc.invalidateQueries({ queryKey: ['people'] }); }} />}
       {linking && <LinkDialog account={linking} onClose={() => setLinking(null)} onDone={() => { setLinking(null); reload(); toast('Linked.'); }} />}
+      {changing && <RoleDialog account={changing} grants={(grants.data ?? []).filter((g) => g.account_id === changing.id)} onClose={() => setChanging(null)} onChanged={reload} />}
       {granting && <GrantDialog account={granting} onClose={() => setGranting(null)} onChanged={reload} />}
     </div>
   );
@@ -309,6 +312,50 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
             onConfirm={async () => { await api.revokeGrant(revoking); onChanged(); void grants.refetch(); toast('Access removed.'); }} />
         );
       })()}
+    </Modal>
+  );
+}
+
+/** Switch an account to another role. Explains what happens to its access before anything changes. */
+function RoleDialog({ account, grants, onClose, onChanged }: { account: Account; grants: Grant[]; onClose: () => void; onChanged: () => void }) {
+  const toast = useToast();
+  const [role, setRole] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const name = account.full_name || account.email || 'This account';
+  const kept = (r: string) => grants.filter((g) => !(r === 'admin' || r === 'member' || (r === 'manager' && g.list_id) || (r === 'reviewer' && g.signup_list_id)));
+  const effect = (r: string) => {
+    if (r === 'admin') return 'They get full control of the system. Any access they were given is cleared because admins do not need it.';
+    if (r === 'member') return `They will only mark their own attendance by scanning. All access they were given is removed${grants.length ? ` (${grants.length} item${grants.length === 1 ? '' : 's'})` : ''}. If they have no personal details yet, they are asked for them next time they sign in.`;
+    const lost = grants.length - kept(r).length;
+    const base = r === 'manager' ? 'They work only with the events and sign-up lists you give them.'
+      : r === 'reviewer' ? 'They see reports and exports for what you give them.' : 'They register people at the venue.';
+    const keep = kept(r).length ? ` ${kept(r).length} access item${kept(r).length === 1 ? ' is' : 's are'} kept.` : '';
+    const drop = lost ? ` ${lost} item${lost === 1 ? '' : 's'} the new role cannot use ${lost === 1 ? 'is' : 'are'} removed (${r === 'manager' ? 'single lists' : 'sign-up lists'}).` : '';
+    const scopeNote = r === 'manager' ? ' They always see only what you select.' : account.role === 'member' || account.role === 'admin' ? (r === 'reviewer' ? ' Reviewers start with only what you select, so choose their access next.' : ' Registrars start with access to everything; change that from Access and permissions if needed.') : '';
+    return base + keep + drop + scopeNote;
+  };
+  const go = async () => {
+    if (!role || busy) return;
+    setBusy(true); setErr('');
+    try { await api.changeRole(account.id, role); onChanged(); toast(`${name} is now ${ROLE_LABEL[role]}.`); onClose(); }
+    catch (e) { setErr(errMsg(e)); setBusy(false); }
+  };
+  return (
+    <Modal title={`Change role for ${name}`} onClose={onClose}>
+      <div className="stack">
+        <p className="muted small" style={{ margin: 0 }}>Now: <b>{ROLE_LABEL[account.role] ?? account.role}</b>. Their sign-in, history and details stay the same.</p>
+        <Field label="New role">
+          <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
+            <option value="">Choose a role…</option>
+            {['admin', 'manager', 'reviewer', 'registrar', 'member'].filter((r) => r !== account.role).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]?.replace(/^./, (c) => c.toUpperCase())}</option>)}
+          </select>
+        </Field>
+        {role && <Alert kind={role === 'admin' ? 'warn' : 'info'}>{effect(role)}</Alert>}
+        {err && <Alert>{err}</Alert>}
+        <button className={`btn block ${role === 'admin' ? 'danger' : 'primary'}`} disabled={!role || busy} onClick={() => void go()}>{busy ? 'Changing…' : 'Change role'}</button>
+        <button className="btn ghost block" onClick={onClose}>Cancel</button>
+      </div>
     </Modal>
   );
 }

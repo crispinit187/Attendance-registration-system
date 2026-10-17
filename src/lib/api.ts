@@ -115,6 +115,7 @@ export const api = {
   linkAccount: (account: string, person: string) => rpc('link_account_person', { p_account: account, p_person: person }),
   grants: () => must<Grant[]>(supabase.from('reviewer_grants').select('*')),
   grant: (account: string, event: string | null, list: string | null, signup: string | null = null) => rpc('grant_access', { p_account: account, p_event: event, p_list: list, p_signup: signup }),
+  changeRole: (id: string, role: string) => rpc<{ from: string; to: string; access_removed: number; scope: string }>('change_role', { p_id: id, p_role: role }),
   setScope: (id: string, scope: 'all' | 'selected') => rpc('set_account_scope', { p_id: id, p_scope: scope }),
   revokeGrant: (id: string) => rpc('revoke_grant', { p_id: id }),
   eventTeam: (event: string) => rpc<TeamMember[]>('event_team', { p_event: event }),

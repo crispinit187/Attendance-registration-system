@@ -19,7 +19,7 @@ In Supabase open **SQL Editor → New query**. Paste the whole contents of each 
 2. `supabase/sql/02_functions.sql`
 3. `supabase/sql/03_security_and_seed.sql`
 
-Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`, `10_realtime.sql`, `11_access_scope.sql`, `12_event_manager.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
+Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`, `10_realtime.sql`, `11_access_scope.sql`, `12_event_manager.sql`, `13_change_role.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
 
 ## 3. Login settings (Authentication)
 - **URL Configuration**: Site URL = your final website address **without a trailing slash**, e.g. `https://YOURNAME.github.io/attendance-registration`. Add the same address (and `http://localhost:5173` for local testing) to **Redirect URLs**.
@@ -104,3 +104,7 @@ Inside what they were given, an event manager can create and edit lists, open an
 Each event and sign-up list shows "Managed by" with its event manager, plus the registrars and reviewers who were given it. Only an admin can change that team (Manage team on the event or sign-up list).
 
 If you run an older database, run `12_event_manager.sql` once and redeploy the function: `npx supabase functions deploy admin-create-user`.
+
+## Changing a role
+
+An admin can switch an existing account to another role (Accounts, the ⋯ menu on the row, Change role). The sign-in, history and details stay. Access that still fits the new role is kept; the rest is removed, and the dialog says what will happen first. You cannot change your own role. Run `13_change_role.sql` once on an existing database.
