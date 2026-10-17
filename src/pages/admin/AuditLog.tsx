@@ -10,7 +10,7 @@ function summary(d: Record<string, unknown>) {
 }
 
 export function AuditLog() {
-  const q = useQuery({ queryKey: ['audit'], queryFn: () => api.audit(500) });
+  const q = useQuery({ queryKey: ['audit'], queryFn: () => api.audit(500), refetchInterval: 30_000 });
   const [f, setF] = useState('');
   if (q.isLoading) return <div className="page wide"><Loading /></div>;
   const rows = (q.data ?? []).filter((r) => !f || `${r.action} ${r.actor_name} ${JSON.stringify(r.details)}`.toLowerCase().includes(f.toLowerCase()));

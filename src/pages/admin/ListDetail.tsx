@@ -17,8 +17,8 @@ export function ListDetail() {
   const toast = useToast();
   const [withRemoved, setWithRemoved] = useState(false);
   const [removing, setRemoving] = useState<AttendanceRow | null>(null);
-  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
+  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const list = lists.data?.find((l) => l.id === id);
   const ev = events.data?.find((e) => e.id === list?.event_id);
   useLiveAttendance([['rows', id]]);

@@ -12,8 +12,8 @@ const BY: Record<string, string> = { self: 'Self-scan', registrar: 'Registrar', 
 const ALL = '__all__';
 
 export function Reviewer() {
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
-  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
+  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
   const [eventId, setEventId] = useState('');
   const [listId, setListId] = useState('');

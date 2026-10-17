@@ -12,8 +12,8 @@ const statusKind = (s: string) => (s === 'open' ? 'ok' : s === 'draft' ? 'accent
 export function Lists() {
   const qc = useQueryClient();
   const toast = useToast();
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
-  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
+  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const [sp, setSp] = useSearchParams();
   const [showArchived, setShowArchived] = useState(false);
   const [newEvent, setNewEvent] = useState(false);

@@ -126,11 +126,16 @@ create policy reviewer_grants_select on public.reviewer_grants for select to aut
 create policy audit_log_select on public.audit_log for select to authenticated
   using (public.app_role() = 'admin');
 
--- Live updates for admin and reviewer screens
+-- Live updates: every screen refreshes itself when these tables change (Row Level Security still applies)
 do $$
+declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    alter publication supabase_realtime add table public.attendance;
+    foreach t in array array['attendance', 'signup_entries', 'signup_lists', 'lists', 'events', 'people', 'accounts', 'audit_log'] loop
+      if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+        execute format('alter publication supabase_realtime add table public.%I', t);
+      end if;
+    end loop;
   end if;
 end $$;
 

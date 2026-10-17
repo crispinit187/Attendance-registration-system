@@ -1,3 +1,4 @@
+import { useLiveSync } from '../lib/live';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
@@ -52,6 +53,7 @@ const jump = (id: string) => {
 
 export function Shell() {
   const { account } = useAuth();
+  useLiveSync();
   const role = account?.role ?? 'member';
   const [active, setActive] = useState('');
   const loc = useLocation();

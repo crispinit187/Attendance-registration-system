@@ -5,8 +5,8 @@ import { Loading } from '../../components/ui';
 import { EventExportPanel, ExportPanel } from '../../components/ExportPanel';
 
 export function Exports() {
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
-  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
+  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const [eventId, setEventId] = useState('');
   const [listId, setListId] = useState('');
   useEffect(() => { if (!eventId && events.data?.length) setEventId(events.data[0]!.id); }, [events.data, eventId]);

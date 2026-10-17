@@ -14,7 +14,7 @@ export function Dashboard() {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const open = useQuery({ queryKey: ['open-list'], queryFn: api.openList, refetchInterval: 15_000 });
+  const open = useQuery({ queryKey: ['open-list'], queryFn: api.openList, refetchInterval: 10_000 });
   const mine = useQuery({
     queryKey: ['my-mark', open.data?.id, person?.id],
     enabled: !!open.data && !!person,

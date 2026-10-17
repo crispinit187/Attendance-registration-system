@@ -27,10 +27,10 @@ export function Accounts() {
   const { session } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts });
-  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople });
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
-  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
+  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
+  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
+  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
   const [inviting, setInviting] = useState(false);
   const [filter, setFilter] = useState('');
@@ -38,7 +38,7 @@ export function Accounts() {
   const [removing, setRemoving] = useState<Account | null>(null);
   const [verifying, setVerifying] = useState<Account | null>(null);
   const [state, setState] = useState<'all' | AccountState>('all');
-  const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses });
+  const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses, refetchInterval: 10_000 });
   const stMap = useMemo(() => new Map((statuses.data ?? []).map((s) => [s.id, s])), [statuses.data]);
   const [linking, setLinking] = useState<Account | null>(null);
   const [granting, setGranting] = useState<Account | null>(null);
@@ -147,8 +147,8 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const [role, setRole] = useState('reviewer');
   const [personQ, setPersonQ] = useState('');
   const [person, setPerson] = useState<{ id: string; full_name: string } | null>(null);
-  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople });
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts });
+  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
+  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
   const taken = new Set((accounts.data ?? []).map((a) => a.person_id));
   const opts = (people.data ?? []).filter((p) => !p.archived && !taken.has(p.id) && personQ.length >= 2 && p.full_name.toLowerCase().includes(personQ.toLowerCase())).slice(0, 6);
   const [err, setErr] = useState('');
@@ -200,8 +200,8 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
 function LinkDialog({ account, onClose, onDone }: { account: Account; onClose: () => void; onDone: () => void }) {
   const [q, setQ] = useState('');
   const toast = useToast();
-  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople });
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts });
+  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
+  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
   const taken = new Set((accounts.data ?? []).map((a) => a.person_id));
   const opts = (people.data ?? []).filter((p) => !p.archived && !taken.has(p.id) && q.length >= 2 && p.full_name.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
   return (
@@ -218,8 +218,8 @@ function LinkDialog({ account, onClose, onDone }: { account: Account; onClose: (
 
 function GrantDialog({ account, onClose, onChanged }: { account: Account; onClose: () => void; onChanged: () => void }) {
   const toast = useToast();
-  const events = useQuery({ queryKey: ['events'], queryFn: api.events });
-  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists });
+  const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
+  const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
   const [ev, setEv] = useState('');
   const [li, setLi] = useState('');

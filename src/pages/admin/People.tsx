@@ -12,9 +12,9 @@ export function People() {
   const qc = useQueryClient();
   const toast = useToast();
   const { areas, voices, titles } = useLookups();
-  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople });
+  const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
   const groups = useQuery({ queryKey: ['district-groups'], queryFn: async () => (await supabase.from('district_groups').select('id,name')).data as { id: string; name: string }[] ?? [] });
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts });
+  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
   const [q, setQ] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [edit, setEdit] = useState<Person | 'new' | null>(null);
@@ -27,7 +27,7 @@ export function People() {
   const aname = useMemo(() => new Map(areas.map((a) => [a.id, a.name])), [areas]);
   const vname = useMemo(() => new Map(voices.map((a) => [a.id, a.name])), [voices]);
   const tname = useMemo(() => new Map(titles.map((a) => [a.id, a.name])), [titles]);
-  const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses });
+  const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses, refetchInterval: 10_000 });
   const accState = useMemo(() => {
     const st = new Map((statuses.data ?? []).map((s) => [s.id, s]));
     return new Map((accounts.data ?? []).filter((a) => a.person_id).map((a) => [a.person_id as string, a.disabled ? 'disabled' : st.has(a.id) && !st.get(a.id)!.verified_at ? 'pending' : 'active']));
