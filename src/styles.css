@@ -250,7 +250,7 @@ textarea.input { padding: 12px 14px; line-height: 1.5; min-height: 160px; font-f
 
 /* "Built by CrispinIT Labs" footer: always at the bottom of the screen, or at the end of long pages */
 #root { min-height: 100dvh; display: flex; flex-direction: column; }
-#root > .shell, #root > .auth-wrap, #root > .venue { min-height: 0; flex: 1 0 auto; }
+#root > .shell, #root > .auth-wrap, #root > .landing, #root > .venue { min-height: 0; flex: 1 0 auto; }
 :root { --foot: 48px; }
 .brandfoot { margin-top: auto; height: var(--foot); box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0 16px; text-align: center; font-size: 12px; letter-spacing: .02em; color: var(--muted); }
 .brandfoot b { font-weight: 600; color: var(--text); }
@@ -262,4 +262,43 @@ body:has(.shell:not(.admin) .bottomnav) .page { padding-bottom: 16px; }   /* the
 @media (max-width: 899px) {   /* the admin also has bottom tabs on phones */
   body:has(.shell.admin .bottomnav) .brandfoot { height: auto; min-height: var(--foot); padding: 12px 16px 92px; }
   body:has(.shell.admin .bottomnav) .page { padding-bottom: 16px; }
+}
+
+/* ---- Landing: sign in and create account, with context beside the form ---- */
+:root { --hero-bg: var(--surface); --hero-text: var(--text); --hero-muted: var(--muted); --hero-chip: var(--accent-soft); }
+:root[data-theme='light'] { --hero-bg: #0A5CFF; --hero-text: #FFFFFF; --hero-muted: rgba(255,255,255,.86); --hero-chip: rgba(255,255,255,.16); --logo-bg: #FFFFFF; --logo-ink: #0A5CFF; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) { --hero-bg: #0A5CFF; --hero-text: #FFFFFF; --hero-muted: rgba(255,255,255,.86); --hero-chip: rgba(255,255,255,.16); --logo-bg: #FFFFFF; --logo-ink: #0A5CFF; }
+}
+.landing { min-height: 100dvh; display: flex; flex-direction: column; }
+.land-hero { box-sizing: border-box; padding: 26px 20px 24px; background: var(--hero-bg); color: var(--hero-text); }
+.land-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; line-height: 1.15; }
+.land-brand .logosvg rect { fill: var(--logo-bg, var(--accent)); }
+.land-brand .logosvg path { stroke: var(--logo-ink, var(--accent-ink)); }
+.land-hero h2 { font-family: var(--serif); font-weight: 600; font-size: 28px; line-height: 1.15; letter-spacing: -.01em; margin: 22px 0 0; }
+.land-hero p { margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: var(--hero-muted); }
+.land-main { flex: 1; box-sizing: border-box; padding: 24px 20px 28px; display: flex; flex-direction: column; align-items: center; gap: 30px; }
+.land-main .auth-card { max-width: 430px; }
+.land-list { display: flex; flex-direction: column; gap: 16px; }
+.land-list .li { display: flex; gap: 14px; align-items: flex-start; }
+.land-list .ico { flex: none; width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.land-list .ico.round { border-radius: 50%; width: 36px; height: 36px; }
+.land-list b { display: block; font-size: 15.5px; font-weight: 600; }
+.land-list span.d { display: block; margin-top: 2px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.land-more { width: 100%; max-width: 430px; }
+.land-more h3 { font-size: 20px; margin: 0 0 14px; }
+.land-hero .land-list { display: none; }
+@media (min-width: 900px) {
+  .landing { flex-direction: row; }
+  .land-hero { flex: 1 1 0; min-width: 0; padding: 48px 64px; display: flex; flex-direction: column; }
+  .land-brand { font-size: 15px; gap: 12px; }
+  .land-hero h2 { font-size: 46px; line-height: 1.1; letter-spacing: -.02em; margin-top: 72px; max-width: 520px; }
+  .land-hero p { font-size: 18px; margin-top: 18px; max-width: 520px; }
+  .land-hero .land-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 28px; margin-top: 40px; max-width: 560px; }
+  .land-hero .land-list.steps3 { display: flex; flex-direction: column; max-width: 520px; }
+  .land-hero .land-list .ico { background: var(--hero-chip); color: var(--hero-text); }
+  .land-hero .land-list b { font-size: 16px; }
+  .land-hero .land-list span.d { color: var(--hero-muted); }
+  .land-main { flex: 1 1 0; min-width: 0; padding: 48px 56px; justify-content: center; }
+  .land-more { display: none; }
 }

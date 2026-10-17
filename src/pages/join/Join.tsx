@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { joinApi, type JoinForm, type Position } from '../../lib/join';
@@ -29,7 +29,14 @@ const friendly = (e: unknown) => {
 /** The public sign-up page: opened from the QR code or the shared link. No account needed. */
 export function Join() {
   const { code = '' } = useParams();
-  const info = useQuery({ queryKey: ['join-info', code], queryFn: () => joinApi.info(code), refetchInterval: 20_000, retry: false });
+  // A rotating list gives the page a ticket on the first load. It is used from then on, so the
+  // visitor can take a few minutes over the form after the screen's code has moved on.
+  const ticket = useRef<string | null>(null);
+  const info = useQuery({
+    queryKey: ['join-info', code],
+    queryFn: async () => { const r = await joinApi.info(ticket.current ?? code); if (r.ticket) ticket.current = r.ticket; return r; },
+    refetchInterval: 20_000, retry: false,
+  });
   const [f, setF] = useState<JoinForm>(empty);
   const [token, setToken] = useState<string | null>(null);
   const [reset, setReset] = useState(0);
@@ -53,7 +60,7 @@ export function Join() {
     setBusy(true);
     try {
       const pos = d.location_check ? await getPosition() : null;
-      const r = await joinApi.submit(code, { ...f, full_name: f.full_name.trim(), district: f.district.trim() }, token, pos, force);
+      const r = await joinApi.submit(ticket.current ?? code, { ...f, full_name: f.full_name.trim(), district: f.district.trim() }, token, pos, force);
       setHasSession(true);
       if (r.status === 'similar') setOut({ kind: 'similar', match: r.match });
       else setOut({ kind: r.status, name: f.full_name.trim() });

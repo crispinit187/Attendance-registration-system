@@ -24,6 +24,8 @@ export function Accounts() {
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
   const [inviting, setInviting] = useState(false);
   const [filter, setFilter] = useState('');
+  const [tab, setTab] = useState<'active' | 'disabled'>('active');
+  const [removing, setRemoving] = useState<Account | null>(null);
   const [linking, setLinking] = useState<Account | null>(null);
   const [granting, setGranting] = useState<Account | null>(null);
   const [toggle, setToggle] = useState<Account | null>(null);
@@ -33,7 +35,10 @@ export function Accounts() {
   const lname = useMemo(() => new Map((lists.data ?? []).map((l) => [l.id, l.title])), [lists.data]);
 
   if (accounts.isLoading) return <div className="page wide"><Loading /></div>;
-  const rows = (accounts.data ?? []).filter((a) => !filter || `${a.email} ${a.full_name} ${a.role}`.toLowerCase().includes(filter.toLowerCase()));
+  const all = accounts.data ?? [];
+  const disabledCount = all.filter((a) => a.disabled).length;
+  const rows = all.filter((a) => (tab === 'disabled') === a.disabled)
+    .filter((a) => !filter || `${a.email} ${a.full_name} ${a.role}`.toLowerCase().includes(filter.toLowerCase()));
   return (
     <div className="page wide stack">
       <div className="row between">
@@ -41,6 +46,11 @@ export function Accounts() {
         <button className="btn primary" onClick={() => setInviting(true)}><Icon name="plus" size={16} />Create account</button>
       </div>
       {accounts.error && <Alert>{errMsg(accounts.error)}</Alert>}
+      <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
+        <button role="tab" type="button" aria-selected={tab === 'active'} className={tab === 'active' ? 'on' : ''} onClick={() => setTab('active')}>Active ({all.length - disabledCount})</button>
+        <button role="tab" type="button" aria-selected={tab === 'disabled'} className={tab === 'disabled' ? 'on' : ''} onClick={() => setTab('disabled')}>Disabled ({disabledCount})</button>
+      </div>
+      {tab === 'disabled' && <div className="muted small">Disabled people cannot sign in. Enable an account to bring it back, or delete it for good. Their attendance history stays either way.</div>}
       <input className="input" placeholder="Search accounts…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="table-wrap">
         <table className="tbl">
@@ -64,10 +74,12 @@ export function Accounts() {
                     {a.id !== session?.user.id && (
                       <button className={`btn small ${a.disabled ? '' : 'danger'}`} onClick={() => setToggle(a)}>{a.disabled ? 'Enable' : 'Disable'}</button>
                     )}
+                    {a.disabled && a.id !== session?.user.id && <button className="btn small danger" onClick={() => setRemoving(a)}>Delete…</button>}
                   </td>
                 </tr>
               );
             })}
+            {rows.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 24 }}>{tab === 'disabled' ? 'No disabled accounts.' : 'No accounts match.'}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -77,6 +89,10 @@ export function Accounts() {
         confirmLabel={toggle.disabled ? 'Enable account' : 'Disable account'}
         body={<p>{toggle.disabled ? 'They will be able to sign in again.' : 'They will not be able to use the app. Their attendance history stays.'}</p>}
         onClose={() => setToggle(null)} onConfirm={async () => { await api.setDisabled(toggle.id, !toggle.disabled); reload(); }} />}
+      {removing && <ConfirmDialog title={`Delete ${removing.full_name || removing.email} for good?`} danger confirmLabel="Delete account" typeToConfirm={removing.email ?? ''}
+        body={<p><b>This cannot be undone.</b> Their sign-in and any reviewer access are removed, and the email can be invited again later. Their attendance history and the linked person record stay. The deletion is written to the audit log.</p>}
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => { await api.deleteAccount(removing.id); toast('Account deleted.'); reload(); void qc.invalidateQueries({ queryKey: ['people'] }); }} />}
       {linking && <LinkDialog account={linking} onClose={() => setLinking(null)} onDone={() => { setLinking(null); reload(); toast('Linked.'); }} />}
       {granting && <GrantDialog account={granting} onClose={() => setGranting(null)} onChanged={reload} />}
     </div>

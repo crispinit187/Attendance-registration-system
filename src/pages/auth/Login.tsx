@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { errMsg } from '../../lib/format';
-import { Alert, BrandLabel } from '../../components/ui';
+import { Alert, Icon, Logo } from '../../components/ui';
 import { Turnstile, turnstileEnabled } from '../../components/Turnstile';
 
 type Mode = 'in' | 'up' | 'forgot';
@@ -12,6 +12,35 @@ const HEAD: Record<Mode, [string, string]> = {
   up: ['Create your account', 'Sign up once. After that, scanning the QR code is all it takes.'],
   forgot: ['Reset your password', 'Enter your email and we will send you a link.'],
 };
+
+const FEATURES = [
+  { icon: 'scan', title: 'Scan to mark present', body: 'Scan the QR code at the venue. Done in a few seconds, from your own phone.' },
+  { icon: 'users', title: 'No phone? No problem', body: 'Registrars can mark people at the door, with duplicate checks built in.' },
+  { icon: 'log', title: 'Sign-up lists', body: 'New people join with a QR code or link. No account needed.' },
+  { icon: 'chart', title: 'Reports you can trust', body: 'Counts by area, district and voice part, with exports and an audit log.' },
+] as const;
+const STEPS = [
+  { title: 'Create your account', body: 'An email and a password of at least 8 characters.' },
+  { title: 'Verify your email', body: 'Open the link we send you. This keeps fake accounts out.' },
+  { title: 'Add your details', body: 'Title, name, area, district and voice part, so registrars see the right information.' },
+];
+
+/** The context list. Beside the form on a computer, under the form on a phone. */
+function LandList({ signup }: { signup: boolean }) {
+  return signup ? (
+    <div className="land-list steps3">
+      {STEPS.map((s, i) => (
+        <div className="li" key={s.title}><div className="ico round">{i + 1}</div><div><b>{s.title}</b><span className="d">{s.body}</span></div></div>
+      ))}
+    </div>
+  ) : (
+    <div className="land-list">
+      {FEATURES.map((f) => (
+        <div className="li" key={f.title}><div className="ico"><Icon name={f.icon} size={20} /></div><div><b>{f.title}</b><span className="d">{f.body}</span></div></div>
+      ))}
+    </div>
+  );
+}
 
 export function SignupSteps({ at }: { at: 0 | 1 | 2 }) {
   return (
@@ -101,9 +130,15 @@ export function Login() {
   };
 
   return (
-    <div className="auth-wrap">
+    <div className="landing">
+      <aside className="land-hero">
+        <div className="land-brand"><Logo size={36} /><div>Attendance<br />Registration System</div></div>
+        <h2>{mode === 'up' ? 'Set up once. After that, scanning is all it takes.' : 'Take attendance in seconds, not in notebooks.'}</h2>
+        <p>{mode === 'up' ? 'Your account keeps your attendance history in one place.' : 'One place to mark who was there, sign up new people and keep an honest record for every event.'}</p>
+        <LandList signup={mode === 'up'} />
+      </aside>
+      <main className="land-main">
       <div className="auth-card">
-        <BrandLabel />
         {mode === 'up' && <SignupSteps at={step === 'verify' ? 1 : 0} />}
         <div className="stack" style={{ gap: 6 }}>
           <h1 className="auth-title">{h1}</h1>
@@ -179,6 +214,11 @@ export function Login() {
           </form>
         )}
       </div>
+      <section className="land-more">
+        <h3>{mode === 'up' ? 'How it works' : 'What you can do here'}</h3>
+        <LandList signup={mode === 'up'} />
+      </section>
+      </main>
     </div>
   );
 }

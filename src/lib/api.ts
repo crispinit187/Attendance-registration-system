@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import type {
   Account, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
   Lookup, OpenList, PasteResult, PasteRowIn, Person, PersonCard, PresentRow, ProfileInput, QrPayload,
-  SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch,
+  SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch, SignupQrPayload,
 } from './types';
 
 async function rpc<T = unknown>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -105,6 +105,16 @@ export const api = {
   grants: () => must<Grant[]>(supabase.from('reviewer_grants').select('*')),
   grant: (account: string, event: string | null, list: string | null) => rpc('grant_reviewer', { p_account: account, p_event: event, p_list: list }),
   revokeGrant: (id: string) => rpc('revoke_grant', { p_id: id }),
+  deleteAccount: async (id: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-create-user', { body: { action: 'delete', id } });
+    if (error) {
+      let msg = error.message;
+      try { const j = await (error as { context?: Response }).context?.json(); if (j?.error) msg = j.error; } catch { /* keep */ }
+      throw new Error(msg);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data as { ok: true };
+  },
   invite: async (v: { email: string; full_name: string; role: string; person_id?: string | null }) => {
     const { data, error } = await supabase.functions.invoke('admin-create-user', { body: v });
     if (error) {
@@ -129,11 +139,12 @@ export const api = {
   signupGet: (id: string) => rpc<SignupDetailInfo>('signup_get', { p_id: id }),
   signupSave: (v: {
     id: string | null; title: string; voices: string[]; areas: string[]; location: boolean;
-    lat: number | null; lng: number | null; radius: number;
+    lat: number | null; lng: number | null; radius: number; rotating: boolean; rotation: number;
   }) => rpc<string>('signup_save', {
     p_id: v.id, p_title: v.title, p_voices: v.voices, p_areas: v.areas, p_location: v.location,
-    p_lat: v.lat, p_lng: v.lng, p_radius: v.radius,
+    p_lat: v.lat, p_lng: v.lng, p_radius: v.radius, p_rotating: v.rotating, p_rotation: v.rotation,
   }),
+  signupQr: (id: string) => rpc<SignupQrPayload>('signup_qr_payload', { p_id: id }),
   signupSetOpen: (id: string, open: boolean) => rpc('signup_set_open', { p_id: id, p_open: open }),
   signupNewLink: (id: string) => rpc<string>('signup_new_link', { p_id: id }),
   signupDelete: (id: string, confirm: string) => rpc('signup_delete', { p_id: id, p_confirm: confirm }),

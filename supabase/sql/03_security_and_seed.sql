@@ -49,7 +49,7 @@ begin
          'signup_save', 'signup_set_open', 'signup_new_link', 'signup_delete',
          'signup_entries', 'signup_paste', 'signup_update_entry', 'signup_remove_entry',
          'signup_restore_entry', 'signup_to_person', 'signup_merge_into',
-         'delete_event', 'archive_event', 'unarchive_event', 'signup_delete_entry'])
+         'delete_event', 'archive_event', 'unarchive_event', 'signup_delete_entry', 'signup_qr_payload'])
   loop
     execute format('grant execute on function %s to authenticated', f.sig);
   end loop;

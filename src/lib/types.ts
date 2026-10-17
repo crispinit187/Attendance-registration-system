@@ -68,7 +68,9 @@ export interface SignupDetailInfo {
   id: string; title: string; status: 'open' | 'closed'; code: string;
   voice_part_ids: string[]; allowed_area_ids: string[]; location_check: boolean;
   venue_lat: number | null; venue_lng: number | null; radius_m: number; opened_at: string | null; entries: number;
+  rotating_qr: boolean; rotation_seconds: number;
 }
+export interface SignupQrPayload { code: string; seconds_left: number; rotation_seconds: number; title: string; entries: number }
 export interface SignupEntry {
   id: string; display_name: string; title_id: string | null; title_specify: string | null; full_name: string;
   area_id: string | null; area: string | null; district: string | null;
@@ -87,6 +89,8 @@ export interface PasteResult {
 }
 export interface JoinInfo {
   title: string; open: boolean; location_check: boolean;
+  /** Only for rotating lists: lets the visitor take a few minutes to fill the form. */
+  ticket?: string | null;
   titles: { id: string; name: string; needs_specify: boolean }[];
   areas: { id: string; name: string }[];
   voices: { id: string; name: string }[];

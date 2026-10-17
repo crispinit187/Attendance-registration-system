@@ -1,5 +1,6 @@
 // Edge Function: admin-create-user
-// Lets a signed-in ADMIN invite someone (reviewer, registrar, member or admin).
+// Lets a signed-in ADMIN invite someone (reviewer, registrar, member or admin),
+// and permanently delete an account that has already been disabled.
 // It needs the service role key, which Supabase provides to the function
 // automatically. The key never reaches the browser.
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -34,10 +35,28 @@ Deno.serve(async (req) => {
 
     // 2. Are they an active admin? (checked in the database, not in the token)
     const { data: me } = await admin.from('accounts').select('role, disabled').eq('id', u.user.id).maybeSingle();
-    if (!me || me.role !== 'admin' || me.disabled) return json({ error: 'Only admins can create accounts.' }, 403);
+    if (!me || me.role !== 'admin' || me.disabled) return json({ error: 'Only admins can do that.' }, 403);
+
+    const body = await req.json().catch(() => ({}));
+
+    // Delete a disabled account for good. Attendance history and the linked person stay.
+    if (body.action === 'delete') {
+      const id = String(body.id ?? '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Unknown account.' }, 400);
+      if (id === u.user.id) return json({ error: 'You cannot delete your own account.' }, 400);
+      const { data: t } = await admin.from('accounts').select('id, email, role, disabled').eq('id', id).maybeSingle();
+      if (!t) return json({ error: 'Account not found.' }, 404);
+      if (!t.disabled) return json({ error: 'Disable the account first, then delete it.' }, 400);
+      const { error: derr } = await admin.auth.admin.deleteUser(id);
+      if (derr) return json({ error: 'Could not delete the account. Nothing was changed.' }, 500);
+      await admin.from('audit_log').insert({
+        actor_id: u.user.id, actor_name: u.user.email, action: 'account.delete', target_type: 'account',
+        target_id: id, details: { email: t.email, role: t.role },
+      });
+      return json({ ok: true });
+    }
 
     // 3. Check the request
-    const body = await req.json().catch(() => ({}));
     const email = String(body.email ?? '').trim().toLowerCase();
     const fullName = String(body.full_name ?? '').trim();
     const role = String(body.role ?? '');

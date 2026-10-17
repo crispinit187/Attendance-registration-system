@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { QRCodeCanvas } from 'qrcode.react';
 import { api } from '../../lib/api';
@@ -44,6 +44,14 @@ export function QrTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: bool
       <div className="card flat stack">
         <h3 style={{ margin: 0 }}>QR code and link</h3>
         {list.status !== 'open' && <Alert kind="warn">Sign-ups are closed. Anyone who scans or opens the link sees a “closed” message until an admin opens sign-ups.</Alert>}
+        {list.rotating_qr ? (
+          <div className="stack">
+            <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>This list uses a <b>rotating QR code</b>. Show it on a screen at the venue and people scan it there. A photo, a printout or a copied link will not work, so there is nothing to download or share.</p>
+            <div className="row">
+              <Link to={`/signup-venue/${list.id}`} className="btn primary"><Icon name="tv" size={16} />Show on screen</Link>
+            </div>
+          </div>
+        ) : (<>
         <div ref={ref} className="qrbox" style={{ alignSelf: 'flex-start' }}><QRCodeCanvas value={url} size={220} marginSize={2} level="M" /></div>
         <div className="row">
           <button className="btn" onClick={save}><Icon name="down" size={16} />Download QR (PNG)</button>
@@ -58,6 +66,7 @@ export function QrTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: bool
           </div>
           <span className="hint">The link does exactly what the QR code does, with the same protections: the open/closed switch, the human check, limits on repeat sign-ups and the duplicate checks{list.location_check ? `, and the location check (${list.radius_m} m)` : ''}.</span>
         </div>
+        </>)}
       </div>
 
       {isAdmin && (
@@ -66,6 +75,7 @@ export function QrTab({ list, isAdmin }: { list: SignupDetailInfo; isAdmin: bool
           <div className="muted small" style={{ lineHeight: 1.7 }}>
             Voice parts offered: <b style={{ color: 'var(--text)' }}>{voiceNames}</b><br />
             Who can sign up: <b style={{ color: 'var(--text)' }}>{areaNames}</b><br />
+            QR code: <b style={{ color: 'var(--text)' }}>{list.rotating_qr ? `Rotating (${list.rotation_seconds} s)` : 'Fixed'}</b><br />
             Location check: <b style={{ color: 'var(--text)' }}>{list.location_check ? `Within ${list.radius_m} m of the venue` : 'Off'}</b>
           </div>
           <div className="row">

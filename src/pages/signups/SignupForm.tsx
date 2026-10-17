@@ -15,6 +15,8 @@ export function SignupForm({ list, onClose, onSaved }: { list: SignupDetailInfo 
   const [lat, setLat] = useState(list?.venue_lat?.toString() ?? '');
   const [lng, setLng] = useState(list?.venue_lng?.toString() ?? '');
   const [radius, setRadius] = useState(String(list?.radius_m ?? 200));
+  const [rotating, setRotating] = useState(list?.rotating_qr ?? false);
+  const [rotation, setRotation] = useState(String(list?.rotation_seconds ?? 30));
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const flip = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
@@ -33,9 +35,11 @@ export function SignupForm({ list, onClose, onSaved }: { list: SignupDetailInfo 
     if (loc && (la === null || ln === null || Number.isNaN(la) || Number.isNaN(ln))) return setErr('Set the venue location (use “Use my location now” while at the venue), or turn the location check off.');
     const r = Number(radius);
     if (!(r >= 20 && r <= 5000)) return setErr('Radius must be between 20 and 5000 metres.');
+    const rot = Number(rotation);
+    if (rotating && !(rot >= 10 && rot <= 600)) return setErr('The code can change every 10 to 600 seconds.');
     setBusy(true);
     try {
-      const id = await api.signupSave({ id: list?.id ?? null, title: title.trim(), voices: vs, areas: allowed, location: loc, lat: loc ? la : null, lng: loc ? ln : null, radius: r });
+      const id = await api.signupSave({ id: list?.id ?? null, title: title.trim(), voices: vs, areas: allowed, location: loc, lat: loc ? la : null, lng: loc ? ln : null, radius: r, rotating, rotation: rotating ? rot : 30 });
       onSaved(id);
     } catch (x) { setErr(errMsg(x)); setBusy(false); }
   };
@@ -66,6 +70,11 @@ export function SignupForm({ list, onClose, onSaved }: { list: SignupDetailInfo 
             </div>
             <Field label="Allowed distance from the venue (metres)"><input className="input" inputMode="numeric" value={radius} onChange={(e) => setRadius(e.target.value.replace(/\D/g, ''))} /></Field>
           </div>
+        )}
+        <label className="check"><input type="checkbox" checked={rotating} onChange={(e) => setRotating(e.target.checked)} />
+          <span><b>Rotating QR code</b><br /><span className="hint">The code changes by itself and is shown live on a screen at the venue. A photo or a forwarded link stops working, so people have to be there. The shared link is not available for this kind of list.</span></span></label>
+        {rotating && (
+          <Field label="Change the code every (seconds)" hint="10 to 600. Thirty is a good start."><input className="input" inputMode="numeric" value={rotation} onChange={(e) => setRotation(e.target.value.replace(/\D/g, ''))} /></Field>
         )}
         {err && <Alert>{err}</Alert>}
         <button className="btn primary block" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>

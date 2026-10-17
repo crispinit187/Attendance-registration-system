@@ -217,6 +217,9 @@ create table public.signup_lists (
   venue_lat        double precision check (venue_lat between -90 and 90),
   venue_lng        double precision check (venue_lng between -180 and 180),
   radius_m         int not null default 200 check (radius_m between 20 and 5000),
+  rotating_qr      boolean not null default false,          -- show a code that changes on a timer instead of a fixed QR/link
+  rotation_seconds int not null default 30 check (rotation_seconds between 10 and 600),
+  rotation_secret  text not null default encode(extensions.gen_random_bytes(16), 'hex'),
   opened_at        timestamptz,
   closed_at        timestamptz,
   created_by       uuid,

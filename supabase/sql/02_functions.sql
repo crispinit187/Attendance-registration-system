@@ -452,22 +452,23 @@ begin
   return public._put_attendance(l.id, pr.id, method, true);
 end $$;
 
--- Quick undo right after a mistaken mark (within 2 minutes, by whoever marked)
+-- Quick undo right after a mistaken mark (within 2 minutes). Whoever made the mark can undo it:
+-- a member who scanned, or a registrar or admin who marked someone.
 create function public.undo_attendance(p_att uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare a public.attendance%rowtype; l public.lists%rowtype;
 begin
-  perform public.need_role(array['admin', 'registrar']);
+  perform public.need_role(array['admin', 'registrar', 'member']);
   select * into a from public.attendance where id = p_att;
   if not found then raise exception 'Attendance record not found.'; end if;
   if a.removed then
     raise exception 'This attendee was already removed. Use Restore instead.';
   end if;
-  if a.marked_by is distinct from auth.uid() or a.method = 'self' then
+  if a.marked_by is distinct from auth.uid() then
     raise exception 'You can only undo a mark that you made.';
   end if;
   if a.marked_at < now() - interval '120 seconds' then
-    raise exception 'The quick undo window has passed. Use Remove instead.';
+    raise exception 'The quick undo window has passed. Please ask a registrar to remove it.';
   end if;
   select * into l from public.lists where id = a.list_id;
   delete from public.attendance where id = a.id;
@@ -1215,17 +1216,71 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Public: what the sign-up page needs to draw itself (no login needed)
 -- ---------------------------------------------------------------------------
+-- Works out which sign-up list a code belongs to and checks it is acceptable.
+--  * a fixed list: the plain code (QR or shared link)
+--  * a rotating list: "<code>.<window>.<mac>" from the screen (this window or the one before),
+--    or a ticket "<code>!<expires>.<mac>" that the page was given when it opened (good for 10 minutes)
+create function public._signup_resolve(p_code text) returns public.signup_lists
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  c text := btrim(coalesce(p_code, ''));
+  l public.signup_lists%rowtype;
+  base text; tail text; w bigint; nw bigint; ex bigint; mac text; good boolean := false;
+begin
+  base := split_part(split_part(c, '!', 1), '.', 1);
+  select * into l from public.signup_lists where code = base;
+  if not found then
+    raise exception 'This link is not valid. Please ask for the current link or QR code.';
+  end if;
+  if not l.rotating_qr then
+    if c <> base then raise exception 'This link is not valid. Please ask for the current link or QR code.'; end if;
+    return l;
+  end if;
+  if c = base then
+    raise exception 'Please scan the QR code shown on the screen to sign up.';
+  end if;
+  begin
+    if position('!' in c) > 0 then
+      tail := split_part(c, '!', 2);
+      ex  := split_part(tail, '.', 1)::bigint;
+      mac := split_part(tail, '.', 2);
+      good := ex >= extract(epoch from now())::bigint
+              and mac = substr(encode(extensions.hmac('t' || ex::text, l.rotation_secret, 'sha256'), 'hex'), 1, 16);
+    else
+      tail := substr(c, char_length(base) + 2);
+      w   := split_part(tail, '.', 1)::bigint;
+      mac := split_part(tail, '.', 2);
+      nw  := floor(extract(epoch from now()) / l.rotation_seconds)::bigint;
+      good := w between nw - 1 and nw and mac = public.rot_code(l.rotation_secret, w);
+    end if;
+  exception when others then
+    good := false;
+  end;
+  if not good then
+    raise exception 'This QR code has expired. Please scan the screen again.';
+  end if;
+  return l;
+end $$;
+
+-- The ticket a page gets for a rotating list after a fresh scan. It lets the visitor take a few
+-- minutes to fill in the form even though the code on the screen has moved on.
+create function public._signup_ticket(l public.signup_lists) returns text
+language plpgsql security definer set search_path = public, extensions as $$
+declare ex bigint := extract(epoch from now())::bigint + 600;
+begin
+  return l.code || '!' || ex::text || '.' ||
+         substr(encode(extensions.hmac('t' || ex::text, l.rotation_secret, 'sha256'), 'hex'), 1, 16);
+end $$;
+
 create function public.signup_public_info(p_code text) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare l public.signup_lists%rowtype; ip text;
 begin
   ip := public._client_ip();
   if ip <> 'unknown' then perform public.rate_check_key('signup_info:' || ip, 120, 600); end if;
-  select * into l from public.signup_lists where code = btrim(coalesce(p_code, ''));
-  if not found then
-    raise exception 'This link is not valid. Please ask for the current link or QR code.';
-  end if;
+  l := public._signup_resolve(p_code);
   return jsonb_build_object(
+    'ticket', case when l.rotating_qr then public._signup_ticket(l) else null end,
     'title', l.title,
     'open', l.status = 'open',
     'location_check', l.location_check,
@@ -1257,10 +1312,7 @@ begin
   if auth.uid() is null then raise exception 'Please try again.'; end if;
   perform public.rate_check('signup_submit', 20, 600);
 
-  select * into l from public.signup_lists where code = btrim(coalesce(p_code, ''));
-  if not found then
-    raise exception 'This link is not valid. Please ask for the current link or QR code.';
-  end if;
+  l := public._signup_resolve(p_code);
   perform public.rate_check_key('signup_list:' || l.id::text, 600, 600);
   ip := public._client_ip();
   if ip <> 'unknown' then perform public.rate_check_key('signup_ip:' || ip, 60, 600); end if;
@@ -1337,12 +1389,36 @@ begin
     'voice_part_ids', l.voice_part_ids, 'allowed_area_ids', l.allowed_area_ids,
     'location_check', l.location_check, 'venue_lat', l.venue_lat, 'venue_lng', l.venue_lng,
     'radius_m', l.radius_m, 'opened_at', l.opened_at,
+    'rotating_qr', l.rotating_qr, 'rotation_seconds', l.rotation_seconds,
+    'entries', (select count(*) from public.signup_entries e where e.list_id = l.id and not e.removed));
+end $$;
+
+-- The rotating code for the sign-up screen (admin, or a registrar for the open list)
+create function public.signup_qr_payload(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare r text; l public.signup_lists%rowtype; w bigint; secs int;
+begin
+  r := public.need_role(array['admin', 'registrar']);
+  perform public.rate_check('qr', 120, 60);
+  select * into l from public.signup_lists where id = p_id;
+  if not found then raise exception 'Sign-up list not found.'; end if;
+  if r = 'registrar' and l.status <> 'open' then
+    raise exception 'You can only see the sign-up list that is open now.';
+  end if;
+  if not l.rotating_qr then raise exception 'This sign-up list uses a fixed QR code, not a rotating one.'; end if;
+  if l.status <> 'open' then raise exception 'Sign-ups are closed. Open them to show the QR code.'; end if;
+  w := floor(extract(epoch from now()) / l.rotation_seconds)::bigint;
+  secs := l.rotation_seconds - (extract(epoch from now())::bigint % l.rotation_seconds)::int;
+  return jsonb_build_object(
+    'code', l.code || '.' || w::text || '.' || public.rot_code(l.rotation_secret, w),
+    'seconds_left', secs, 'rotation_seconds', l.rotation_seconds, 'title', l.title,
     'entries', (select count(*) from public.signup_entries e where e.list_id = l.id and not e.removed));
 end $$;
 
 create function public.signup_save(
   p_id uuid, p_title text, p_voices uuid[], p_areas uuid[],
-  p_location boolean, p_lat double precision, p_lng double precision, p_radius int
+  p_location boolean, p_lat double precision, p_lng double precision, p_radius int,
+  p_rotating boolean default false, p_rotation int default 30
 ) returns uuid
 language plpgsql security definer set search_path = public, extensions as $$
 declare lid uuid; vs uuid[] := coalesce(p_voices, '{}'); ar uuid[] := coalesce(p_areas, '{}');
@@ -1358,17 +1434,22 @@ begin
   if p_location and (p_lat is null or p_lng is null) then
     raise exception 'Set the venue location, or turn the location check off.';
   end if;
+  if coalesce(p_rotation, 30) not between 10 and 600 then
+    raise exception 'The code can change every 10 to 600 seconds.';
+  end if;
   if p_id is null then
     insert into public.signup_lists (title, voice_part_ids, allowed_area_ids, location_check,
-                                     venue_lat, venue_lng, radius_m, created_by)
-    values (btrim(p_title), vs, ar, p_location, p_lat, p_lng, coalesce(p_radius, 200), auth.uid())
+                                     venue_lat, venue_lng, radius_m, rotating_qr, rotation_seconds, created_by)
+    values (btrim(p_title), vs, ar, p_location, p_lat, p_lng, coalesce(p_radius, 200),
+            coalesce(p_rotating, false), coalesce(p_rotation, 30), auth.uid())
     returning id into lid;
     perform public.log_action('signup.create', 'signup', lid::text, jsonb_build_object('title', btrim(p_title)));
   else
     update public.signup_lists
        set title = btrim(p_title), voice_part_ids = vs, allowed_area_ids = ar,
            location_check = p_location, venue_lat = p_lat, venue_lng = p_lng,
-           radius_m = coalesce(p_radius, 200)
+           radius_m = coalesce(p_radius, 200),
+           rotating_qr = coalesce(p_rotating, false), rotation_seconds = coalesce(p_rotation, 30)
      where id = p_id
      returning id into lid;
     if lid is null then raise exception 'Sign-up list not found.'; end if;

@@ -17,6 +17,7 @@ import { History } from './pages/member/History';
 import { Profile } from './pages/member/Profile';
 import { Registrar } from './pages/registrar/Registrar';
 import { VenueScreen } from './pages/venue/VenueScreen';
+import { SignupVenue } from './pages/signups/SignupVenue';
 import { Reviewer } from './pages/reviewer/Reviewer';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Lists } from './pages/admin/Lists';
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="/set-password" element={<Guard><SetPassword /></Guard>} />
         <Route path="/details" element={<Guard roles={['member']}><Details /></Guard>} />
         <Route path="/venue/:listId" element={<Guard roles={['admin', 'registrar']}><VenueScreen /></Guard>} />
+        <Route path="/signup-venue/:listId" element={<Guard roles={['admin', 'registrar']}><SignupVenue /></Guard>} />
 
         <Route element={<Guard roles={['member']}><Shell /></Guard>}>
           <Route path="/app" element={<Dashboard />} />
