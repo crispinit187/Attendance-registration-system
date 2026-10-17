@@ -46,12 +46,50 @@ Deno.serve(async (req) => {
       if (id === u.user.id) return json({ error: 'You cannot delete your own account.' }, 400);
       const { data: t } = await admin.from('accounts').select('id, email, role, disabled').eq('id', id).maybeSingle();
       if (!t) return json({ error: 'Account not found.' }, 404);
-      if (!t.disabled) return json({ error: 'Disable the account first, then delete it.' }, 400);
+      if (!t.disabled) {
+        // Someone who never verified has nothing to protect, so they can go without being disabled first.
+        const { data: gu } = await admin.auth.admin.getUserById(id);
+        if (gu?.user?.email_confirmed_at) return json({ error: 'Disable the account first, then delete it.' }, 400);
+      }
       const { error: derr } = await admin.auth.admin.deleteUser(id);
       if (derr) return json({ error: 'Could not delete the account. Nothing was changed.' }, 500);
       await admin.from('audit_log').insert({
         actor_id: u.user.id, actor_name: u.user.email, action: 'account.delete', target_type: 'account',
         target_id: id, details: { email: t.email, role: t.role },
+      });
+      return json({ ok: true });
+    }
+
+    // Manual override: mark the email as verified without the link.
+    // An invited person still sets a password with "Forgot password" on the sign-in page.
+    if (body.action === 'verify') {
+      const id = String(body.id ?? '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Unknown account.' }, 400);
+      const { data: t } = await admin.from('accounts').select('id, email, role').eq('id', id).maybeSingle();
+      if (!t) return json({ error: 'Account not found.' }, 404);
+      const { error: verr } = await admin.auth.admin.updateUserById(id, { email_confirm: true });
+      if (verr) return json({ error: 'Could not verify the account.' }, 500);
+      await admin.from('audit_log').insert({
+        actor_id: u.user.id, actor_name: u.user.email, action: 'account.verify', target_type: 'account',
+        target_id: id, details: { email: t.email, role: t.role },
+      });
+      return json({ ok: true });
+    }
+
+    // Send the invitation email again, for an invited person who has not accepted yet.
+    if (body.action === 'resend') {
+      const id = String(body.id ?? '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Unknown account.' }, 400);
+      const { data: t } = await admin.from('accounts').select('id, email, must_set_password').eq('id', id).maybeSingle();
+      if (!t || !t.email) return json({ error: 'Account not found.' }, 404);
+      const { data: gu } = await admin.auth.admin.getUserById(id);
+      if (gu?.user?.email_confirmed_at) return json({ error: 'This person has already verified their email.' }, 400);
+      if (!t.must_set_password) return json({ error: 'This person signed up themselves. Ask them to use Resend email on the sign-in page, or verify them manually.' }, 400);
+      const { error: rerr } = await admin.auth.admin.inviteUserByEmail(t.email);
+      if (rerr) return json({ error: rerr.message || 'Could not send the invitation.' }, 400);
+      await admin.from('audit_log').insert({
+        actor_id: u.user.id, actor_name: u.user.email, action: 'account.resend', target_type: 'account',
+        target_id: id, details: { email: t.email },
       });
       return json({ ok: true });
     }

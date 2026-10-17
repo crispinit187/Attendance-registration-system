@@ -27,6 +27,11 @@ export function People() {
   const aname = useMemo(() => new Map(areas.map((a) => [a.id, a.name])), [areas]);
   const vname = useMemo(() => new Map(voices.map((a) => [a.id, a.name])), [voices]);
   const tname = useMemo(() => new Map(titles.map((a) => [a.id, a.name])), [titles]);
+  const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses });
+  const accState = useMemo(() => {
+    const st = new Map((statuses.data ?? []).map((s) => [s.id, s]));
+    return new Map((accounts.data ?? []).filter((a) => a.person_id).map((a) => [a.person_id as string, a.disabled ? 'disabled' : st.has(a.id) && !st.get(a.id)!.verified_at ? 'pending' : 'active']));
+  }, [accounts.data, statuses.data]);
   const hasAcc = useMemo(() => new Set((accounts.data ?? []).map((a) => a.person_id).filter(Boolean)), [accounts.data]);
   const shown = (people.data ?? []).filter((p) => (showArchived ? true : !p.archived) && !p.merged_into && (!q || p.full_name.toLowerCase().includes(q.toLowerCase())));
   const reload = () => { void qc.invalidateQueries({ queryKey: ['people'] }); void qc.invalidateQueries({ queryKey: ['district-groups'] }); };
@@ -54,7 +59,9 @@ export function People() {
                 <td>{p.district_group_id ? gname.get(p.district_group_id) : ''}</td>
                 <td>{p.voice_part_id ? vname.get(p.voice_part_id) : ''}</td>
                 <td>{p.contact}</td>
-                <td>{hasAcc.has(p.id) ? <Badge kind="ok">yes</Badge> : <span className="muted">none</span>}</td>
+                <td>{hasAcc.has(p.id)
+                  ? <Badge kind={accState.get(p.id) === 'active' ? 'ok' : accState.get(p.id) === 'disabled' ? 'danger' : 'warn'}>{accState.get(p.id) === 'pending' ? 'pending' : accState.get(p.id) === 'disabled' ? 'disabled' : 'yes'}</Badge>
+                  : <span className="muted">none</span>}</td>
                 <td className="row" style={{ flexWrap: 'nowrap' }}>
                   <button className="btn small" onClick={() => setEdit(p)}>Edit</button>
                   <button className="btn small ghost" onClick={() => setMerge(p)}>Merge…</button>

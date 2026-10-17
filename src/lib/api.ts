@@ -1,9 +1,20 @@
 import { supabase } from './supabase';
 import type {
-  Account, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
+  Account, AccountStatus, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
   Lookup, OpenList, PasteResult, PasteRowIn, Person, PersonCard, PresentRow, ProfileInput, QrPayload,
   SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch, SignupQrPayload,
 } from './types';
+
+async function fn(action: string, id: string) {
+  const { data, error } = await supabase.functions.invoke('admin-create-user', { body: { action, id } });
+  if (error) {
+    let msg = error.message;
+    try { const j = await (error as { context?: Response }).context?.json(); if (j?.error) msg = j.error; } catch { /* keep */ }
+    throw new Error(msg);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data as { ok: true };
+}
 
 async function rpc<T = unknown>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
@@ -105,6 +116,9 @@ export const api = {
   grants: () => must<Grant[]>(supabase.from('reviewer_grants').select('*')),
   grant: (account: string, event: string | null, list: string | null) => rpc('grant_reviewer', { p_account: account, p_event: event, p_list: list }),
   revokeGrant: (id: string) => rpc('revoke_grant', { p_id: id }),
+  accountStatuses: () => rpc<AccountStatus[]>('account_statuses'),
+  verifyAccount: (id: string) => fn('verify', id),
+  resendInvite: (id: string) => fn('resend', id),
   deleteAccount: async (id: string) => {
     const { data, error } = await supabase.functions.invoke('admin-create-user', { body: { action: 'delete', id } });
     if (error) {

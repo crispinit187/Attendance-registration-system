@@ -19,7 +19,7 @@ In Supabase open **SQL Editor → New query**. Paste the whole contents of each 
 2. `supabase/sql/02_functions.sql`
 3. `supabase/sql/03_security_and_seed.sql`
 
-Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
+Already running an older database? Instead run the newer files you have not run yet, in order: `05_event_and_entry_delete.sql`, `06_event_archive.sql`, `07_signup_rotating_qr.sql`, `08_member_undo.sql`, `09_account_status.sql`. (A fresh install does not need them; 01 to 03 already include everything.)
 
 ## 3. Login settings (Authentication)
 - **URL Configuration**: Site URL = your final website address **without a trailing slash**, e.g. `https://YOURNAME.github.io/attendance-registration`. Add the same address (and `http://localhost:5173` for local testing) to **Redirect URLs**.

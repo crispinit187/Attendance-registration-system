@@ -4,6 +4,8 @@ export interface Account {
   id: string; email: string | null; full_name: string | null; role: Role;
   person_id: string | null; must_set_password: boolean; disabled: boolean; created_at: string;
 }
+export interface AccountStatus { id: string; verified_at: string | null; last_sign_in_at: string | null; invited_at: string | null }
+export type AccountState = 'pending' | 'setup' | 'active' | 'disabled';
 export interface Lookup { id: string; name: string; sort: number; active: boolean; needs_specify?: boolean }
 export interface Person {
   id: string; title_id: string | null; title_specify: string | null; full_name: string;

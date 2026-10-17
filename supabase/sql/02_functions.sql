@@ -905,6 +905,17 @@ begin
     'account', p_id::text, jsonb_build_object('email', a.email, 'role', a.role));
 end $$;
 
+-- Admin: when each account verified its email and last signed in (for the Status column)
+create function public.account_statuses() returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+begin
+  perform public.need_role(array['admin']);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', u.id, 'verified_at', u.email_confirmed_at, 'last_sign_in_at', u.last_sign_in_at, 'invited_at', u.invited_at))
+      from auth.users u join public.accounts a on a.id = u.id), '[]'::jsonb);
+end $$;
+
 create function public.link_account_person(p_account uuid, p_person uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare a public.accounts%rowtype;

@@ -42,7 +42,7 @@ begin
          'restore_person', 'delete_person', 'merge_people',
          'create_event', 'rename_event', 'save_list', 'open_list', 'close_list',
          'archive_list', 'unarchive_list', 'delete_list', 'get_qr_payload',
-         'set_account_disabled', 'link_account_person', 'grant_reviewer', 'revoke_grant',
+         'set_account_disabled', 'account_statuses', 'link_account_person', 'grant_reviewer', 'revoke_grant',
          'rename_district', 'merge_districts', 'log_export',
          'my_history', 'event_breakdown', 'district_overview',
          'signup_public_info', 'signup_submit', 'signup_lists_overview', 'signup_get',

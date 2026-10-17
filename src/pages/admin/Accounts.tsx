@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { errMsg, fmtDate } from '../../lib/format';
-import type { Account } from '../../lib/types';
+import type { Account, AccountState, AccountStatus } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 
 const ROLE_HELP: Record<string, string> = {
@@ -12,6 +12,16 @@ const ROLE_HELP: Record<string, string> = {
   reviewer: 'Sees reports and exports for the events or lists you give them.',
   admin: 'Full control.',
 };
+
+const STATE_LABEL: Record<AccountState, string> = { pending: 'Pending verification', setup: 'Verified, no details yet', active: 'Active', disabled: 'Disabled' };
+
+/** Where an account is in its life: not verified yet, verified but not set up, or in use. */
+function stateOf(a: Account, s: AccountStatus | undefined): AccountState {
+  if (a.disabled) return 'disabled';
+  if (s && !s.verified_at) return 'pending';
+  if (a.role === 'member' && !a.person_id) return 'setup';
+  return 'active';
+}
 
 export function Accounts() {
   const { session } = useAuth();
@@ -26,10 +36,14 @@ export function Accounts() {
   const [filter, setFilter] = useState('');
   const [tab, setTab] = useState<'active' | 'disabled'>('active');
   const [removing, setRemoving] = useState<Account | null>(null);
+  const [verifying, setVerifying] = useState<Account | null>(null);
+  const [state, setState] = useState<'all' | AccountState>('all');
+  const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses });
+  const stMap = useMemo(() => new Map((statuses.data ?? []).map((s) => [s.id, s])), [statuses.data]);
   const [linking, setLinking] = useState<Account | null>(null);
   const [granting, setGranting] = useState<Account | null>(null);
   const [toggle, setToggle] = useState<Account | null>(null);
-  const reload = () => { void qc.invalidateQueries({ queryKey: ['accounts'] }); void qc.invalidateQueries({ queryKey: ['grants'] }); };
+  const reload = () => { void qc.invalidateQueries({ queryKey: ['accounts'] }); void qc.invalidateQueries({ queryKey: ['account-statuses'] }); void qc.invalidateQueries({ queryKey: ['grants'] }); };
   const pname = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.full_name])), [people.data]);
   const ename = useMemo(() => new Map((events.data ?? []).map((e) => [e.id, e.name])), [events.data]);
   const lname = useMemo(() => new Map((lists.data ?? []).map((l) => [l.id, l.title])), [lists.data]);
@@ -37,7 +51,9 @@ export function Accounts() {
   if (accounts.isLoading) return <div className="page wide"><Loading /></div>;
   const all = accounts.data ?? [];
   const disabledCount = all.filter((a) => a.disabled).length;
+  const pendingCount = all.filter((a) => stateOf(a, stMap.get(a.id)) === 'pending').length;
   const rows = all.filter((a) => (tab === 'disabled') === a.disabled)
+    .filter((a) => state === 'all' || tab === 'disabled' || stateOf(a, stMap.get(a.id)) === state)
     .filter((a) => !filter || `${a.email} ${a.full_name} ${a.role}`.toLowerCase().includes(filter.toLowerCase()));
   return (
     <div className="page wide stack">
@@ -47,14 +63,21 @@ export function Accounts() {
       </div>
       {accounts.error && <Alert>{errMsg(accounts.error)}</Alert>}
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        <button role="tab" type="button" aria-selected={tab === 'active'} className={tab === 'active' ? 'on' : ''} onClick={() => setTab('active')}>Active ({all.length - disabledCount})</button>
+        <button role="tab" type="button" aria-selected={tab === 'active'} className={tab === 'active' ? 'on' : ''} onClick={() => setTab('active')}>Active and pending ({all.length - disabledCount})</button>
         <button role="tab" type="button" aria-selected={tab === 'disabled'} className={tab === 'disabled' ? 'on' : ''} onClick={() => setTab('disabled')}>Disabled ({disabledCount})</button>
       </div>
+      {tab === 'active' && (
+        <div className="row" style={{ gap: 6 }}>
+          {([['all', 'All'], ['pending', `Pending verification${pendingCount ? ` (${pendingCount})` : ''}`], ['setup', 'No details yet'], ['active', 'Active']] as const).map(([k, l]) => (
+            <button key={k} type="button" className={`btn small ${state === k ? 'primary' : ''}`} onClick={() => setState(k)}>{l}</button>
+          ))}
+        </div>
+      )}
       {tab === 'disabled' && <div className="muted small">Disabled people cannot sign in. Enable an account to bring it back, or delete it for good. Their attendance history stays either way.</div>}
       <input className="input" placeholder="Search accounts…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Linked person</th><th>Since</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Linked person</th><th>Since</th><th></th></tr></thead>
           <tbody>
             {rows.map((a) => {
               const mine = (grants.data ?? []).filter((g) => g.account_id === a.id);
@@ -66,20 +89,35 @@ export function Accounts() {
                     {a.role === 'reviewer' && <div className="muted small" style={{ whiteSpace: 'normal' }}>
                       {mine.length ? mine.map((g) => (g.event_id ? `Event: ${ename.get(g.event_id)}` : `List: ${lname.get(g.list_id!)}`)).join(', ') : 'No access yet'}</div>}
                   </td>
+                  <td>{(() => {
+                    const s = stMap.get(a.id); const k = stateOf(a, s);
+                    return (
+                      <>
+                        <Badge kind={k === 'active' ? 'ok' : k === 'disabled' ? 'danger' : 'warn'}>{STATE_LABEL[k]}</Badge>
+                        <div className="muted small" style={{ whiteSpace: 'normal' }}>
+                          {k === 'pending' ? `Since ${fmtDate(s?.invited_at ?? a.created_at)}` : s?.last_sign_in_at ? `Last in ${fmtDate(s.last_sign_in_at)}` : s ? 'Never signed in' : ''}
+                        </div>
+                      </>
+                    );
+                  })()}</td>
                   <td>{a.person_id ? pname.get(a.person_id) ?? 'Linked' : <span className="muted">none</span>}</td>
                   <td>{fmtDate(a.created_at)}</td>
                   <td className="row" style={{ flexWrap: 'nowrap' }}>
                     {a.role === 'reviewer' && <button className="btn small" onClick={() => setGranting(a)}>Access…</button>}
                     {!a.person_id && a.role !== 'reviewer' && <button className="btn small ghost" onClick={() => setLinking(a)}>Link person…</button>}
+                    {stateOf(a, stMap.get(a.id)) === 'pending' && <button className="btn small" onClick={() => setVerifying(a)}>Verify now…</button>}
+                    {stateOf(a, stMap.get(a.id)) === 'pending' && a.must_set_password && (
+                      <button className="btn small ghost" onClick={async () => { try { await api.resendInvite(a.id); toast('Invitation sent again.'); } catch (e) { toast(errMsg(e)); } }}>Resend invite</button>
+                    )}
                     {a.id !== session?.user.id && (
                       <button className={`btn small ${a.disabled ? '' : 'danger'}`} onClick={() => setToggle(a)}>{a.disabled ? 'Enable' : 'Disable'}</button>
                     )}
-                    {a.disabled && a.id !== session?.user.id && <button className="btn small danger" onClick={() => setRemoving(a)}>Delete…</button>}
+                    {(a.disabled || stateOf(a, stMap.get(a.id)) === 'pending') && a.id !== session?.user.id && <button className="btn small danger" onClick={() => setRemoving(a)}>Delete…</button>}
                   </td>
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 24 }}>{tab === 'disabled' ? 'No disabled accounts.' : 'No accounts match.'}</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>{tab === 'disabled' ? 'No disabled accounts.' : 'No accounts match.'}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -89,6 +127,10 @@ export function Accounts() {
         confirmLabel={toggle.disabled ? 'Enable account' : 'Disable account'}
         body={<p>{toggle.disabled ? 'They will be able to sign in again.' : 'They will not be able to use the app. Their attendance history stays.'}</p>}
         onClose={() => setToggle(null)} onConfirm={async () => { await api.setDisabled(toggle.id, !toggle.disabled); reload(); }} />}
+      {verifying && <ConfirmDialog title={`Verify ${verifying.full_name || verifying.email} by hand?`} confirmLabel="Verify now"
+        body={<p>This skips the email link and marks the address as verified. Use it only when you are sure the address is theirs. If they were invited and have not chosen a password yet, they can use “Forgot password?” on the sign-in page. It is written to the audit log.</p>}
+        onClose={() => setVerifying(null)}
+        onConfirm={async () => { await api.verifyAccount(verifying.id); toast('Marked as verified.'); reload(); }} />}
       {removing && <ConfirmDialog title={`Delete ${removing.full_name || removing.email} for good?`} danger confirmLabel="Delete account" typeToConfirm={removing.email ?? ''}
         body={<p><b>This cannot be undone.</b> Their sign-in and any reviewer access are removed, and the email can be invited again later. Their attendance history and the linked person record stay. The deletion is written to the audit log.</p>}
         onClose={() => setRemoving(null)}
