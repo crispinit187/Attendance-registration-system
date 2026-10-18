@@ -1,3 +1,4 @@
+import { BackButton } from '../../components/BackButton';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,7 +40,7 @@ export function TrackerEventPage() {
   return (
     <div className="page wide stack">
       <div className="stack" style={{ gap: 4 }}>
-        <Link to="/trackers" className="small">← Trackers</Link>
+        <BackButton to="/trackers">Trackers</BackButton>
         <div className="row between">
           <h1 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge kind="warn">archived</Badge>}</h1>
           <div className="row">

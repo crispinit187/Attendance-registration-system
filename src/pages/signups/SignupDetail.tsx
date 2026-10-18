@@ -1,3 +1,4 @@
+import { BackButton } from '../../components/BackButton';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -36,7 +37,7 @@ export function SignupDetail() {
     <>
       <div className="row between">
         <div>
-          <Link to="/signups" className="small">← Sign-ups</Link>
+          <BackButton to="/signups">Sign-ups</BackButton>
           <h1 style={{ margin: '4px 0 0' }}>{list.title}</h1>
           <div className="muted small">Anyone with the QR code or link can sign up while sign-ups are open.</div>
         </div>

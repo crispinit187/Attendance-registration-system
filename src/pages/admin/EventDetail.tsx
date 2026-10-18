@@ -1,3 +1,4 @@
+import { BackButton } from '../../components/BackButton';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,7 +39,7 @@ export function EventDetail() {
   return (
     <div className="page wide stack">
       <div className="stack" style={{ gap: 4 }}>
-        <Link to={`${base}/lists`} className="small">← Events</Link>
+        <BackButton to={`${base}/lists`}>Events</BackButton>
         <div className="row between">
           <h1 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge kind="warn">archived</Badge>}</h1>
           <div className="row">

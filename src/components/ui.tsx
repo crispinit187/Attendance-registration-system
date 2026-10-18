@@ -27,6 +27,7 @@ const paths: Record<string, string> = {
   lock: 'M6 11h12v10H6zM8 11V8a4 4 0 018 0v3',
   link: 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
+  back: 'M15 6l-6 6 6 6',
   warn: 'M12 3l10 18H2zM12 10v5M12 18h.01',
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',
   chat: 'M4 5h16v11H9l-5 4z',

@@ -1,3 +1,4 @@
+import { BackButton } from '../../components/BackButton';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,7 +23,7 @@ export function Duplicates() {
   const pairs = q.data ?? [];
   return (
     <div className="page wide stack">
-      <Link to="/admin/people" className="small">← People</Link>
+      <BackButton to="/admin/people">People</BackButton>
       <h1 style={{ margin: 0 }}>Possible duplicates</h1>
       <p className="muted" style={{ margin: 0 }}>People with a very similar name, or the same phone number. Nothing is joined automatically. Merging keeps one person: all attendance, tracker entries and ticks move to them, and any empty details are filled from the other.</p>
       {q.error && <Alert>{errMsg(q.error)}</Alert>}

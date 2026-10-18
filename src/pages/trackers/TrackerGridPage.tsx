@@ -1,3 +1,4 @@
+import { BackButton } from '../../components/BackButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -123,7 +124,7 @@ export function TrackerGridPage() {
   return (
     <div className="page wide stack">
       <div className="stack" style={{ gap: 4 }}>
-        <div className="small"><Link to="/trackers">Trackers</Link> / <Link to={`/trackers/${eventId}`}>{g.list.event_name}</Link></div>
+        <BackButton to={`/trackers/${eventId}`}>{g.list.event_name}</BackButton>
         <div className="row between">
           <h1 style={{ margin: 0 }}>{g.list.title} {g.list.archived && <Badge kind="warn">archived</Badge>}</h1>
           <div className="row">

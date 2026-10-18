@@ -1,3 +1,4 @@
+import { BackButton } from '../../components/BackButton';
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,7 +44,7 @@ export function ListDetail() {
     <div className="page wide stack">
       <div className="row between">
         <div>
-          <Link to={ev ? `${base}/events/${ev.id}` : `${base}/lists`} className="small">← {ev?.name ?? 'Events'}</Link>
+          <BackButton to={ev ? `${base}/events/${ev.id}` : `${base}/lists`}>{ev?.name ?? 'Events'}</BackButton>
           <h1 style={{ margin: '4px 0 0' }}>{list.title}</h1>
           <div className="muted">{ev?.name} <Badge kind={list.status === 'open' ? 'ok' : list.status === 'archived' ? 'warn' : ''}>{list.status}</Badge></div>
         </div>

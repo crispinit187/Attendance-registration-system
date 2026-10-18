@@ -418,3 +418,13 @@ table.tgrid { border-collapse: separate; border-spacing: 0; font-size: .92rem; m
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
+
+/* compact top bar: no empty strip above the pages */
+@media (min-width: 900px) {
+  .shell.admin .topbar { padding: 6px 24px 0; min-height: 0; }
+  .shell.admin .topbar .iconbtn { width: 36px; height: 36px; border-radius: 10px; }
+  .shell.admin .page { padding-top: 6px !important; }
+}
+
+.backbtn { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-weight: 600; gap: 6px; text-decoration: none; }
+.backbtn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
