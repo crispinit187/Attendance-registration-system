@@ -14,20 +14,24 @@ const MEMBER: Item[] = [
 ];
 const ADMIN: Item[] = [
   { to: '/admin', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/admin/lists', label: 'Events and lists', icon: 'cal' },
+  { to: '/admin/lists', label: 'Events', icon: 'cal' },
+  { to: '/trackers', label: 'Trackers', icon: 'list' },
   { to: '/signups', label: 'Sign-ups', icon: 'link' },
   { to: '/admin/people', label: 'People', icon: 'users' },
   { to: '/admin/accounts', label: 'Accounts', icon: 'shield' },
   { to: '/admin/setup', label: 'Areas, titles and voice parts', icon: 'tag' },
   { to: '/admin/districts', label: 'Districts', icon: 'pin' },
+  { to: '/admin/congregations', label: 'Congregations', icon: 'pin' },
   { to: '/admin/audit', label: 'Audit log', icon: 'log' },
   { to: '/admin/exports', label: 'Exports', icon: 'down' },
 ];
 const MANAGER: Item[] = [
-  { to: '/manage/lists', label: 'Events and lists', icon: 'cal' },
+  { to: '/manage/lists', label: 'Events', icon: 'cal' },
+  { to: '/trackers', label: 'Trackers', icon: 'list' },
   { to: '/signups', label: 'Sign-ups', icon: 'link' },
   { to: '/manage/exports', label: 'Exports', icon: 'down' },
 ];
+const LISTMGR: Item[] = [{ to: '/trackers', label: 'Trackers', icon: 'list' }];
 const REVIEWER = [
   { id: 'rv-top', label: 'Overview', icon: 'home' },
   { id: 'rv-access', label: 'Lists', icon: 'list' },
@@ -88,6 +92,7 @@ export function Shell() {
             <button key={i.id} className={onRegistrar && (active === i.id || (!active && i.id === 'rg-mark')) ? 'active' : ''}
               onClick={() => { setActive(i.id); if (onRegistrar) jump(i.id); else { nav('/registrar'); setTimeout(() => jump(i.id), 250); } }}><Icon name={i.icon} size={22} />{i.label}</button>
           ))}
+          <NavLink to="/trackers" className={({ isActive }) => (isActive ? 'active' : '')}><Icon name="list" size={22} />Trackers</NavLink>
           <NavLink to="/signups" className={({ isActive }) => (isActive ? 'active' : '')}><Icon name="link" size={22} />Sign-ups</NavLink>
         </nav>
       </div>
@@ -96,14 +101,15 @@ export function Shell() {
 
   // Admin, event manager and reviewer: sidebar on desktop, top bar on phones.
   const isAdmin = role === 'admin';
-  const items = isAdmin ? ADMIN : role === 'manager' ? MANAGER : null;
+  const onTrackers = loc.pathname.startsWith('/trackers');
+  const items = isAdmin ? ADMIN : role === 'manager' ? MANAGER : role === 'list_manager' ? LISTMGR : role === 'reviewer' && onTrackers ? [{ to: '/review', label: 'Attendance', icon: 'chart' }, { to: '/trackers', label: 'Trackers', icon: 'list' }] : null;
   return (
     <div className="shell admin">
       <nav className="sidenav" aria-label="Sections">
         <div className="brand" style={{ padding: '0 8px 18px', margin: 0, fontSize: 12 }}><svg width="36" height="36" viewBox="0 0 44 44" aria-hidden="true"><rect x="2" y="2" width="40" height="40" rx="12" fill="var(--accent)" /><path d="M13 23l6 6 12-13" fill="none" stroke="var(--accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg><div>Attendance<br />Registration</div></div>
         {items
           ? items.map((i) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}>{i.label}</NavLink>)
-          : REVIEWER.map((i) => <a key={i.id} href="#" className={(active || 'rv-top') === i.id ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActive(i.id); jump(i.id); }}>{i.label}</a>)}
+          : <>{REVIEWER.map((i) => <a key={i.id} href="#" className={(active || 'rv-top') === i.id ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActive(i.id); jump(i.id); }}>{i.label}</a>)}<NavLink to="/trackers" className={({ isActive }) => (isActive ? 'active' : '')}>Trackers</NavLink></>}
         <div className="signed">Signed in as<br /><b>{name}</b>
           <div style={{ marginTop: 10 }}><HeaderActions /></div></div>
       </nav>

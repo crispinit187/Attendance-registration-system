@@ -108,3 +108,20 @@ If you run an older database, run `12_event_manager.sql` once and redeploy the f
 ## Changing a role
 
 An admin can switch an existing account to another role (Accounts, the ⋯ menu on the row, Change role). The sign-in, history and details stay. Access that still fits the new role is kept; the rest is removed, and the dialog says what will happen first. You cannot change your own role. Run `13_change_role.sql` once on an existing database.
+
+## Trackers (Stage 1)
+A separate **Trackers** section for events where people are ticked against dates without needing accounts. A tracker event holds lists (for example East, West, South, North); each list is a grid of people with a column per date.
+
+**Setting up an existing system**
+1. Run `supabase/sql/14_trackers.sql` once in the Supabase SQL Editor (it can safely be run twice). A brand new project runs 01, 02, 03, then 14.
+2. Redeploy the invite function (it now knows the *list manager* role): `npx supabase functions deploy admin-create-user`.
+3. Run `npm install` (new package `read-excel-file`, used for .xlsx import), then rebuild and push as usual.
+
+**Roles**
+- *List manager* (new): works with the tracker lists an admin gives them; adds date columns, imports spreadsheets, ticks people, removes and restores people, sees phone numbers.
+- Event managers can be given tracker events. Registrars tick and add people; reviewers view only. Registrars and reviewers never see phone numbers.
+- Give access from Accounts → Access and permissions, or from a tracker event's *Manage team* box.
+
+**Spreadsheet import** (list or whole event): choose a .xlsx or .csv, match the columns, match unknown voice spellings (remembered afterwards), review new districts and congregations, preview, then Import. Imported people are saved in People. Nothing is merged automatically; look-alikes appear in **People → Possible duplicates**.
+
+**Also new**: Congregations page (same spelling-matching as districts), optional Title, Events pages now show events first with lists, team and analytics inside each event, and a PDF analytics report for both attendance and tracker events.

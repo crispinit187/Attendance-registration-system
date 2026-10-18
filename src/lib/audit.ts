@@ -2,6 +2,8 @@ import type { AuditRow } from './types';
 
 const s = (v: unknown) => (v === null || v === undefined ? '' : String(v));
 
+const grantWhat = (d: Record<string, unknown>) => d.tracker_event_id ? 'Whole tracker event' : d.tracker_list_id ? 'One tracker list' : d.event_id ? 'Whole event' : d.signup_list_id ? 'One sign-up list' : 'One list';
+
 /** Turns an audit row into a sentence like the mockup: "<who> <what>" plus a detail line. */
 export function describeAudit(r: AuditRow): { what: string; why: string } {
   const d = r.details as Record<string, unknown>;
@@ -40,8 +42,27 @@ export function describeAudit(r: AuditRow): { what: string; why: string } {
     case 'account.disable': return { what: `disabled the account of ${s(d.email)}`, why: '' };
     case 'account.enable': return { what: `enabled the account of ${s(d.email)}`, why: '' };
     case 'account.link': return { what: `linked the account of ${s(d.email)} to a person`, why: '' };
-    case 'grant.add': return { what: `gave ${s(d.email)} access`, why: d.event_id ? 'Whole event' : d.signup_list_id ? 'One sign-up list' : 'One list' };
-    case 'grant.remove': return { what: 'removed an access grant', why: d.event_id ? 'Whole event' : d.signup_list_id ? 'One sign-up list' : 'One list' };
+    case 'grant.add': return { what: `gave ${s(d.email)} access`, why: grantWhat(d) };
+    case 'grant.remove': return { what: 'removed an access grant', why: grantWhat(d) };
+    case 'tracker.event.create': return { what: `created the tracker event ${s(d.name)}`, why: '' };
+    case 'tracker.event.rename': return { what: `renamed the tracker event ${s(d.from)} to ${s(d.to)}`, why: '' };
+    case 'tracker.event.delete': return { what: `deleted the tracker event ${s(d.name)}`, why: 'Its lists and ticks were deleted with it' };
+    case 'tracker.list.create': return { what: `added the tracker list ${s(d.title)}`, why: '' };
+    case 'tracker.list.edit': return { what: `changed the tracker list ${s(d.title)}`, why: '' };
+    case 'tracker.list.delete': return { what: `deleted the tracker list ${s(d.title)}`, why: '' };
+    case 'tracker.date.add': return { what: `added the date ${s(d.date)}${d.title ? ` (${s(d.title)})` : ''} to ${s(d.list_title)}`, why: Number(d.lists) > 1 ? `Added to ${s(d.lists)} lists` : '' };
+    case 'tracker.date.edit': return { what: `changed a date on ${s(d.list_title)}`, why: '' };
+    case 'tracker.date.remove': return { what: `removed the date ${s(d.date)} from ${s(d.list_title)}`, why: 'Ticks are kept and come back if the date is restored' };
+    case 'tracker.date.restore': return { what: `restored the date ${s(d.date)} on ${s(d.list_title)}`, why: '' };
+    case 'tracker.entry.add': return { what: `added ${s(d.person)} to ${s(d.list_title)}`, why: '' };
+    case 'tracker.entry.remove': return { what: `removed ${s(d.person)} from ${s(d.list_title)}`, why: '' };
+    case 'tracker.entry.restore': return { what: `restored ${s(d.person)} on ${s(d.list_title)}`, why: '' };
+    case 'tracker.person.create': return { what: `registered a new person, ${s(d.person)}, on ${s(d.list_title)}`, why: '' };
+    case 'tracker.import': return { what: `imported a spreadsheet (${s(d.rows)} rows)`, why: `${s(d.new_people)} new people, ${s(d.existing_people)} already known, ${s(d.added_to_list)} added to lists${d.date ? `, ticked for ${s(d.date)}` : ''}` };
+    case 'congregation.rename': return { what: `renamed congregation ${s(d.from)} to ${s(d.to)}`, why: '' };
+    case 'congregation.merge': return { what: `merged congregation ${s(d.merged)} into ${s(d.into)}`, why: '' };
+    case 'congregation.delete': return { what: `deleted the congregation ${s(d.name)}`, why: '' };
+    case 'person.not_duplicate': return { what: 'marked two people as not the same person', why: '' };
     case 'person.archive': return { what: `archived ${s(d.person)}`, why: '' };
     case 'person.restore': return { what: `restored ${s(d.person)}`, why: '' };
     case 'person.delete': return { what: `deleted ${s(d.person)}`, why: '' };

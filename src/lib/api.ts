@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type {
-  Account, AccountStatus, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
+  Account, AccountStatus, DuplicatePair, ImportMap, ImportResult, ImportRowIn, TrackerAnalytics, TrackerCard, TrackerEvent, TrackerGrid, TrackerPersonInput, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
   Lookup, OpenList, PasteResult, PasteRowIn, Person, PersonCard, PresentRow, ProfileInput, QrPayload,
   SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch, SignupQrPayload, TeamMember,
 } from './types';
@@ -31,6 +31,8 @@ const profileArgs = (p: ProfileInput) => ({
   p_title_id: p.title_id, p_title_specify: p.title_specify || null, p_full_name: p.full_name,
   p_area_id: p.area_id, p_voice_part_id: p.voice_part_id, p_district: p.district || null, p_contact: p.contact || null,
 });
+// create_person / update_person also take the congregation
+const profileArgsC = (p: ProfileInput) => ({ ...profileArgs(p), p_congregation: p.congregation || null });
 
 export const api = {
   // lookups
@@ -72,12 +74,19 @@ export const api = {
   // people
   searchPeople: (q: string, list: string | null) => rpc<PersonCard[]>('search_people', { p_q: q, p_list: list }),
   createPerson: (p: ProfileInput, force: boolean) =>
-    rpc<{ status: 'similar'; matches: PersonCard[] } | { status: 'created'; id: string }>('create_person', { ...profileArgs(p), p_force: force }),
-  updatePerson: (id: string, p: ProfileInput) => rpc('update_person', { p_id: id, ...profileArgs(p) }),
+    rpc<{ status: 'similar'; matches: PersonCard[] } | { status: 'created'; id: string }>('create_person', { ...profileArgsC(p), p_force: force }),
+  updatePerson: (id: string, p: ProfileInput) => rpc('update_person', { p_id: id, ...profileArgsC(p) }),
   archivePerson: (id: string) => rpc('archive_person', { p_id: id }),
   restorePerson: (id: string) => rpc('restore_person', { p_id: id }),
   deletePerson: (id: string) => rpc('delete_person', { p_id: id }),
   mergePeople: (keep: string, merge: string) => rpc('merge_people', { p_keep: keep, p_merge: merge }),
+  duplicates: () => rpc<DuplicatePair[]>('people_duplicates'),
+  dismissDuplicate: (a: string, b: string) => rpc('dismiss_duplicate', { p_a: a, p_b: b }),
+  congregations: () => rpc<DistrictGroup[]>('congregation_overview'),
+  suggestCongregations: (q: string) => rpc<{ id: string; name: string }[]>('suggest_congregations', { p_q: q }),
+  renameCongregation: (id: string, name: string) => rpc('rename_congregation', { p_id: id, p_name: name }),
+  mergeCongregations: (from: string, to: string) => rpc('merge_congregations', { p_from: from, p_to: to }),
+  deleteCongregation: (id: string) => rpc('delete_congregation', { p_id: id }),
   allPeople: () => must<Person[]>(supabase.from('people').select('*').order('full_name')),
 
   // events & lists
@@ -133,6 +142,8 @@ export const api = {
     if (data?.error) throw new Error(data.error);
     return data as { ok: true };
   },
+  grantTracker: (account: string, event: string | null, list: string | null) => rpc('grant_tracker_access', { p_account: account, p_event: event, p_list: list }),
+  trackerTeam: (event: string, list: string | null = null) => rpc<TeamMember[]>('tracker_team', { p_event: event, p_list: list }),
   invite: async (v: { email: string; full_name: string; role: string; person_id?: string | null; scope?: 'all' | 'selected' }) => {
     const { data, error } = await supabase.functions.invoke('admin-create-user', { body: v });
     if (error) {
@@ -149,8 +160,42 @@ export const api = {
   renameDistrict: (id: string, name: string) => rpc('rename_district', { p_id: id, p_name: name }),
   mergeDistricts: (from: string, to: string) => rpc('merge_districts', { p_from: from, p_to: to }),
   audit: (limit = 300) => must<AuditRow[]>(supabase.from('audit_log').select('*').order('at', { ascending: false }).limit(limit)),
-  logExport: (scope: 'list' | 'event' | 'signup', target: string, format: string, details: Record<string, unknown> = {}) =>
+  logExport: (scope: 'list' | 'event' | 'signup' | 'tracker_event' | 'tracker_list', target: string, format: string, details: Record<string, unknown> = {}) =>
     rpc('log_export', { p_scope: scope, p_target: target, p_format: format, p_details: details }),
+
+  // trackers
+  trackerOverview: () => rpc<TrackerEvent[]>('tracker_overview'),
+  trackerEvent: (id: string) => rpc<TrackerEvent>('tracker_event_get', { p_event: id }),
+  trackerCreateEvent: (name: string) => rpc<string>('tracker_create_event', { p_name: name }),
+  trackerRenameEvent: (id: string, name: string) => rpc('tracker_rename_event', { p_id: id, p_name: name }),
+  trackerArchive: (id: string, archived: boolean) => rpc('tracker_set_archived', { p_id: id, p_archived: archived }),
+  trackerDeleteEvent: (id: string, confirm: string) => rpc('tracker_delete_event', { p_id: id, p_confirm: confirm }),
+  trackerSaveList: (id: string | null, event: string, title: string, expected: number | null) =>
+    rpc<string>('tracker_save_list', { p_id: id, p_event: event, p_title: title, p_expected: expected }),
+  trackerDeleteList: (id: string, confirm: string) => rpc('tracker_delete_list', { p_id: id, p_confirm: confirm }),
+  trackerGrid: (list: string) => rpc<TrackerGrid>('tracker_grid', { p_list: list }),
+  trackerAddDate: (list: string, date: string, title: string, all: boolean) =>
+    rpc<{ added: number }>('tracker_add_date', { p_list: list, p_date: date, p_title: title || null, p_all: all }),
+  trackerUpdateDate: (id: string, date: string, title: string) => rpc('tracker_update_date', { p_date: id, p_on: date, p_title: title || null }),
+  trackerRemoveDate: (id: string) => rpc('tracker_remove_date', { p_date: id }),
+  trackerRestoreDate: (id: string) => rpc('tracker_restore_date', { p_date: id }),
+  trackerMark: (entry: string, date: string, on: boolean) => rpc('tracker_set_mark', { p_entry: entry, p_date: date, p_on: on, p_at: null }),
+  trackerSearch: (list: string, q: string) => rpc<TrackerCard[]>('tracker_search_people', { p_list: list, p_q: q }),
+  trackerAddEntry: (list: string, person: string, dates: string[]) =>
+    rpc<{ status: 'added' | 'already' | 'restored'; entry_id: string }>('tracker_add_entry', { p_list: list, p_person: person, p_dates: dates }),
+  trackerCreatePerson: (list: string, p: TrackerPersonInput, dates: string[], force: boolean) =>
+    rpc<{ status: 'created'; entry_id: string; person_id: string } | { status: 'similar'; matches: TrackerCard[] }>('tracker_create_person', {
+      p_list: list, p_name: p.name, p_title_id: p.title_id, p_title_specify: p.title_specify || null, p_area_id: p.area_id,
+      p_voice_part_id: p.voice_part_id, p_district: p.district || null, p_congregation: p.congregation || null,
+      p_contact: p.contact || null, p_dates: dates, p_force: force,
+    }),
+  trackerSetTitle: (person: string, title: string | null, specify: string) => rpc('tracker_set_title', { p_person: person, p_title_id: title, p_specify: specify || null }),
+  trackerRemoveEntry: (id: string) => rpc('tracker_remove_entry', { p_entry: id }),
+  trackerRestoreEntry: (id: string) => rpc('tracker_restore_entry', { p_entry: id }),
+  trackerAnalytics: (event: string, list: string | null, date: string | null) =>
+    rpc<TrackerAnalytics>('tracker_analytics', { p_event: event, p_list: list, p_date: date }),
+  trackerImport: (event: string | null, list: string | null, rows: ImportRowIn[], date: string | null, dateTitle: string, map: ImportMap, commit: boolean) =>
+    rpc<ImportResult>('tracker_import', { p_event: event, p_list: list, p_rows: rows, p_date: date, p_date_title: dateTitle || null, p_map: map, p_commit: commit }),
 
   // sign-up lists
   signupLists: () => rpc<SignupListRow[]>('signup_lists_overview'),

@@ -13,7 +13,7 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-const ROLES = ['admin', 'manager', 'reviewer', 'registrar', 'member'];
+const ROLES = ['admin', 'manager', 'list_manager', 'reviewer', 'registrar', 'member'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
     // 5. Set role (stored in the accounts table, never in user-editable metadata). Event managers always work with what is selected.
     const { error: aerr } = await admin.from('accounts').update({
-      role, full_name: fullName, access_scope: role === 'manager' || body.scope === 'selected' ? 'selected' : 'all',
+      role, full_name: fullName, access_scope: role === 'manager' || role === 'list_manager' || body.scope === 'selected' ? 'selected' : 'all',
       must_set_password: true, person_id: personId, created_by: u.user.id,
     }).eq('id', inv.user.id);
     if (aerr) {

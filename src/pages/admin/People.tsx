@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +15,7 @@ export function People() {
   const { areas, voices, titles } = useLookups();
   const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
   const groups = useQuery({ queryKey: ['district-groups'], queryFn: async () => (await supabase.from('district_groups').select('id,name')).data as { id: string; name: string }[] ?? [] });
+  const cgroups = useQuery({ queryKey: ['congregation-groups'], queryFn: async () => (await supabase.from('congregation_groups').select('id,name')).data as { id: string; name: string }[] ?? [] });
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
   const [q, setQ] = useState('');
   const [showArchived, setShowArchived] = useState(false);
@@ -24,6 +26,7 @@ export function People() {
   const [similar, setSimilar] = useState<{ v: ProfileInput; matches: PersonCard[] } | null>(null);
 
   const gname = useMemo(() => new Map((groups.data ?? []).map((g) => [g.id, g.name])), [groups.data]);
+  const cname = useMemo(() => new Map((cgroups.data ?? []).map((g) => [g.id, g.name])), [cgroups.data]);
   const aname = useMemo(() => new Map(areas.map((a) => [a.id, a.name])), [areas]);
   const vname = useMemo(() => new Map(voices.map((a) => [a.id, a.name])), [voices]);
   const tname = useMemo(() => new Map(titles.map((a) => [a.id, a.name])), [titles]);
@@ -34,14 +37,17 @@ export function People() {
   }, [accounts.data, statuses.data]);
   const hasAcc = useMemo(() => new Set((accounts.data ?? []).map((a) => a.person_id).filter(Boolean)), [accounts.data]);
   const shown = (people.data ?? []).filter((p) => (showArchived ? true : !p.archived) && !p.merged_into && (!q || p.full_name.toLowerCase().includes(q.toLowerCase())));
-  const reload = () => { void qc.invalidateQueries({ queryKey: ['people'] }); void qc.invalidateQueries({ queryKey: ['district-groups'] }); };
+  const reload = () => { void qc.invalidateQueries({ queryKey: ['people'] }); void qc.invalidateQueries({ queryKey: ['district-groups'] }); void qc.invalidateQueries({ queryKey: ['congregation-groups'] }); };
 
   if (people.isLoading) return <div className="page wide"><Loading /></div>;
   return (
     <div className="page wide stack">
       <div className="row between">
         <h1 style={{ margin: 0 }}>People</h1>
-        <button className="btn primary" onClick={() => setEdit('new')}><Icon name="plus" size={16} />New person</button>
+        <div className="row">
+          <Link className="btn" to="/admin/duplicates">Possible duplicates</Link>
+          <button className="btn primary" onClick={() => setEdit('new')}><Icon name="plus" size={16} />New person</button>
+        </div>
       </div>
       {people.error && <Alert>{errMsg(people.error)}</Alert>}
       <div className="row">
@@ -50,13 +56,14 @@ export function People() {
       </div>
       <div className="table-wrap" style={{ maxHeight: '70dvh', overflowY: 'auto' }}>
         <table className="tbl">
-          <thead><tr><th>Name</th><th>Area</th><th>District</th><th>Voice</th><th>Contact</th><th>Account</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Area</th><th>District</th><th>Congregation</th><th>Voice</th><th>Contact</th><th>Account</th><th></th></tr></thead>
           <tbody>
             {shown.map((p) => (
               <tr key={p.id}>
                 <td><b>{[p.title_id ? (p.title_specify ?? tname.get(p.title_id)) : '', p.full_name].filter(Boolean).join(' ')}</b> {p.archived && <Badge kind="warn">archived</Badge>}</td>
                 <td>{p.area_id ? aname.get(p.area_id) : ''}</td>
                 <td>{p.district_group_id ? gname.get(p.district_group_id) : ''}</td>
+                <td>{p.congregation_group_id ? cname.get(p.congregation_group_id) : ''}</td>
                 <td>{p.voice_part_id ? vname.get(p.voice_part_id) : ''}</td>
                 <td>{p.contact}</td>
                 <td>{hasAcc.has(p.id)
@@ -72,15 +79,15 @@ export function People() {
                 </td>
               </tr>
             ))}
-            {!shown.length && <tr><td colSpan={7} className="muted center">No one found.</td></tr>}
+            {!shown.length && <tr><td colSpan={8} className="muted center">No one found.</td></tr>}
           </tbody>
         </table>
       </div>
 
       {edit && (
         <Modal title={edit === 'new' ? 'New person' : 'Edit person'} onClose={() => setEdit(null)}>
-          <PersonForm
-            initial={edit === 'new' ? undefined : profileFromPerson(edit, edit.district_group_id ? gname.get(edit.district_group_id) ?? '' : '')}
+          <PersonForm staff
+            initial={edit === 'new' ? undefined : profileFromPerson(edit, edit.district_group_id ? gname.get(edit.district_group_id) ?? '' : '', edit.congregation_group_id ? cname.get(edit.congregation_group_id) ?? '' : '')}
             submitLabel={edit === 'new' ? 'Create person' : 'Save changes'}
             extra={edit !== 'new' ? <p className="hint">Editing does not change past attendance records; they keep the details from the time.</p> : undefined}
             onSubmit={async (v) => {

@@ -6,11 +6,13 @@ import { Alert, Field, Loading } from './ui';
 import { DistrictInput } from './DistrictInput';
 
 export const emptyProfile: ProfileInput = {
-  title_id: null, title_specify: '', full_name: '', area_id: null, voice_part_id: null, district: '', contact: '',
+  title_id: null, title_specify: '', full_name: '', area_id: null, voice_part_id: null, district: '', contact: '', congregation: '',
 };
 
-export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extra, nameOnly, compact, relaxed, voiceIds, areaIds }: {
+export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extra, nameOnly, compact, relaxed, voiceIds, areaIds, staff }: {
   initial?: ProfileInput; submitLabel: string; nameOnly?: boolean; compact?: boolean;
+  /** Staff adding or editing someone: the title is optional and a congregation can be entered. Members signing up still choose a title. */
+  staff?: boolean;
   /** Only the name is required (used when staff edit a sign-up entry). */
   relaxed?: boolean; voiceIds?: string[]; areaIds?: string[];
   onSubmit: (v: ProfileInput) => Promise<void>; extra?: ReactNode;
@@ -29,7 +31,7 @@ export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extr
     if (v.full_name.trim().length < 2) return setErr('Please enter the full name.');
     if (relaxed && !contactOk(v.contact)) return setErr('Contact must look like +260 977 123 456, or be left empty.');
     if (!nameOnly && !relaxed) {
-      if (!v.title_id) return setErr('Please choose a title.');
+      if (!staff && !v.title_id) return setErr('Please choose a title.');
       if (title?.needs_specify && !v.title_specify.trim()) return setErr(`Please say which ${title.name} (for example the office or role).`);
       if (!v.area_id) return setErr('Please choose an area.');
       if (!v.voice_part_id) return setErr('Please choose a voice part.');
@@ -45,7 +47,7 @@ export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extr
   return (
     <form className="stack" style={{ gap: 14 }} onSubmit={submit} noValidate>
       {!nameOnly && (
-        <Field label="Title">
+        <Field label={staff ? 'Title (optional)' : 'Title'}>
           <select className="input" value={v.title_id ?? ''} onChange={(e) => set('title_id', e.target.value || null)}>
             <option value="">Choose…</option>
             {titles.filter((t) => t.active || t.id === v.title_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -79,6 +81,11 @@ export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extr
           <Field label="District">
             <DistrictInput value={v.district} onChange={(d) => set('district', d)} compact={compact} />
           </Field>
+          {staff && (
+            <Field label="Congregation (optional)">
+              <DistrictInput kind="congregation" value={v.congregation ?? ''} onChange={(d) => set('congregation', d)} compact />
+            </Field>
+          )}
           <Field label="Contact (optional)">
             <input className="input" inputMode="tel" value={v.contact} placeholder="+260 9XX XXX XXX" autoComplete="tel"
               onChange={(e) => set('contact', formatContactInput(e.target.value))} />
@@ -95,9 +102,9 @@ export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extr
 export function profileFromPerson(p: {
   title_id: string | null; title_specify: string | null; full_name: string; area_id: string | null;
   voice_part_id: string | null; contact: string | null;
-}, district: string): ProfileInput {
+}, district: string, congregation = ''): ProfileInput {
   return {
     title_id: p.title_id, title_specify: p.title_specify ?? '', full_name: p.full_name, area_id: p.area_id,
-    voice_part_id: p.voice_part_id, district, contact: p.contact ?? '',
+    voice_part_id: p.voice_part_id, district, contact: p.contact ?? '', congregation,
   };
 }

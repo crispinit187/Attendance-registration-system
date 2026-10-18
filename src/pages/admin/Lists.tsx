@@ -1,158 +1,73 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useMemo, useState } from 'react';
+import { Link, Navigate, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth, useBase, useLookups } from '../../lib/auth';
-import { errMsg, fmtDateTime } from '../../lib/format';
+import { errMsg } from '../../lib/format';
 import type { EventRow, ListRow } from '../../lib/types';
-import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
-import { TeamPanel } from '../../components/TeamPanel';
+import { Alert, Badge, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 
-const statusKind = (s: string) => (s === 'open' ? 'ok' : s === 'draft' ? 'accent' : s === 'archived' ? 'warn' : '');
+export const statusKind = (s: string) => (s === 'open' ? 'ok' : s === 'draft' ? 'accent' : s === 'archived' ? 'warn' : '');
 
 export function Lists() {
   const qc = useQueryClient();
   const toast = useToast();
-  const isAdmin = useAuth().account?.role === 'admin';   // event managers work inside their events but cannot create or change events
+  const role = useAuth().account?.role;
+  const isAdmin = role === 'admin';   // event managers work inside their events but cannot create or change events
   const base = useBase();
   const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
-  const [sp, setSp] = useSearchParams();
+  const [sp] = useSearchParams();
   const [showArchived, setShowArchived] = useState(false);
   const [newEvent, setNewEvent] = useState(false);
-  const [rename, setRename] = useState<EventRow | null>(null);
-  const [evAct, setEvAct] = useState<{ kind: 'archive' | 'delete'; event: EventRow; lists?: number } | null>(null);   // event being archived / deleted
-  const [form, setForm] = useState<{ event: EventRow; list: ListRow | null } | null>(null);
-  const [act, setAct] = useState<{ kind: 'open' | 'close' | 'archive' | 'delete'; list: ListRow } | null>(null);
-
-  const reload = () => { void qc.invalidateQueries({ queryKey: ['lists'] }); void qc.invalidateQueries({ queryKey: ['events'] }); void qc.invalidateQueries({ queryKey: ['open-lists'] }); };
+  const reload = () => { void qc.invalidateQueries({ queryKey: ['lists'] }); void qc.invalidateQueries({ queryKey: ['events'] }); };
+  const wantNew = sp.get('new');
   const byEvent = useMemo(() => {
     const m = new Map<string, ListRow[]>();
-    for (const l of lists.data ?? []) { if (!showArchived && l.status === 'archived') continue; (m.get(l.event_id) ?? m.set(l.event_id, []).get(l.event_id)!).push(l); }
+    for (const l of lists.data ?? []) { if (l.status === 'archived') continue; (m.get(l.event_id) ?? m.set(l.event_id, []).get(l.event_id)!).push(l); }
     return m;
-  }, [lists.data, showArchived]);
-  const wantNew = sp.get('new');
-  useEffect(() => {
-    if (!wantNew || !events.data) return;
-    const ev = events.data.find((e) => e.id === wantNew);
-    if (ev) setForm({ event: ev, list: null });
-    setSp({}, { replace: true });
-  }, [wantNew, events.data]); // eslint-disable-line
+  }, [lists.data]);
 
+  if (wantNew) return <Navigate to={`${base}/events/${wantNew}?new=1`} replace />;
   if (events.isLoading || lists.isLoading) return <div className="page wide"><Loading /></div>;
   const err = events.error ?? lists.error;
+  const shown = (events.data ?? []).filter((ev) => showArchived || !ev.archived_at);
+  // Someone who works on exactly one list goes straight to it
+  const all = events.data ?? [];
+  const only = all.length === 1 ? byEvent.get(all[0]!.id) ?? [] : [];
+  if (!isAdmin && role !== 'manager' && only.length === 1) return <Navigate to={`${base}/lists/${only[0]!.id}`} replace />;
   return (
     <div className="page wide stack">
       <div className="row between">
-        <h1 style={{ margin: 0 }}>Events and lists</h1>
+        <h1 style={{ margin: 0 }}>Events</h1>
         <div className="row">
           <label className="check small"><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />Show archived</label>
           {isAdmin && <button className="btn primary" onClick={() => setNewEvent(true)}><Icon name="plus" size={16} />New event</button>}
         </div>
       </div>
+      <p className="muted" style={{ margin: 0 }}>Open an event to see its lists, who manages it, and its analytics.</p>
       {err && <Alert>{errMsg(err)}</Alert>}
-      {!events.data?.length && <div className="card hero muted">{isAdmin ? 'No events yet. Create an event (for example “Annual Conference 2026”), then add lists to it.' : 'No event has been given to you yet. Ask an admin to assign you one.'}</div>}
-
-      {events.data?.filter((ev) => showArchived || !ev.archived_at).map((ev) => {
-        const ls = byEvent.get(ev.id) ?? [];
-        const allLists = (lists.data ?? []).filter((l) => l.event_id === ev.id);
-        return (
-          <div className="card stack" key={ev.id}>
-            <div className="row between">
-              <h2 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge>archived</Badge>}</h2>
-              <div className="row">
-                {isAdmin && <button className="btn small ghost" onClick={() => setRename(ev)}>Rename</button>}
-                {!ev.archived_at && <button className="btn small" onClick={() => setForm({ event: ev, list: null })}><Icon name="plus" size={14} />Add list</button>}
-                {isAdmin && !ev.archived_at && <button className="btn small" onClick={() => setEvAct({ kind: 'archive', event: ev })}>Archive</button>}
-                {isAdmin && ev.archived_at && (
-                  <>
-                    <button className="btn small" onClick={async () => { try { await api.unarchiveEvent(ev.id); toast('Event restored from the archive.'); reload(); } catch (e) { toast(errMsg(e)); } }}>Restore</button>
-                    <button className="btn small danger" onClick={() => setEvAct({ kind: 'delete', event: ev, lists: allLists.length })}>Delete…</button>
-                  </>
-                )}
-              </div>
-            </div>
-            <TeamPanel kind="event" targetId={ev.id} canEdit={isAdmin} />
-            {ls.length === 0 && <p className="muted small" style={{ margin: 0 }}>No lists in this event yet.</p>}
-            {ls.map((l) => (
-              <div className="item" key={l.id}>
-                <div className="grow">
-                  <Link to={`${base}/lists/${l.id}`} style={{ fontWeight: 700, textDecoration: 'none' }}>{l.title}</Link>{' '}
-                  <Badge kind={statusKind(l.status)}>{l.status}</Badge>
-                  <div className="muted small">
-                    {l.opened_at ? `Opened ${fmtDateTime(l.opened_at)}` : `Created ${fmtDateTime(l.created_at)}`}
-                    {l.rotating_qr ? ' · rotating QR' : ''}{l.location_check ? ` · within ${l.radius_m} m` : ''}
-                    {l.allowed_area_ids.length ? ` · ${l.allowed_area_ids.length} area(s) only` : ''}
-                  </div>
-                </div>
-                <div className="row">
-                  {(l.status === 'draft' || l.status === 'closed') && <button className="btn small primary" onClick={() => setAct({ kind: 'open', list: l })}>{l.status === 'closed' ? 'Re-open' : 'Open'}</button>}
-                  {l.status === 'open' && <button className="btn small danger" onClick={() => setAct({ kind: 'close', list: l })}>Close</button>}
-                  {l.status !== 'archived' && l.status !== 'open' && <button className="btn small" onClick={() => setForm({ event: ev, list: l })}>Edit</button>}
-                  {l.status === 'open' && <button className="btn small" onClick={() => setForm({ event: ev, list: l })}>Edit</button>}
-                  {l.status === 'closed' && <button className="btn small" onClick={() => setAct({ kind: 'archive', list: l })}>Archive</button>}
-                  {l.status === 'draft' && <button className="btn small" onClick={() => setAct({ kind: 'archive', list: l })}>Archive</button>}
-                  {l.status === 'archived' && (
-                    <>
-                      <button className="btn small" onClick={async () => { try { await api.unarchiveList(l.id); toast('Restored from archive.'); reload(); } catch (e) { toast(errMsg(e)); } }}>Restore</button>
-                      <button className="btn small danger" onClick={() => setAct({ kind: 'delete', list: l })}>Delete…</button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })}
-
+      {!shown.length && <div className="card hero muted">{isAdmin ? 'No events yet. Create an event (for example “Annual Conference 2026”), then add lists to it.' : 'No event has been given to you yet. Ask an admin to assign you one.'}</div>}
+      <div className="grid c2">
+        {shown.map((ev) => {
+          const ls = byEvent.get(ev.id) ?? [];
+          const open = ls.filter((l) => l.status === 'open').length;
+          return (
+            <Link key={ev.id} to={`${base}/events/${ev.id}`} className="card stack" style={{ textDecoration: 'none', color: 'inherit', gap: 6 }}>
+              <h2 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge kind="warn">archived</Badge>}</h2>
+              <div className="muted small">{ls.length} {ls.length === 1 ? 'list' : 'lists'}{open ? ` · ${open} open now` : ''}</div>
+              <div className="row" style={{ gap: 6 }}>{ls.slice(0, 5).map((l) => <Badge key={l.id} kind={statusKind(l.status)}>{l.title}</Badge>)}</div>
+            </Link>
+          );
+        })}
+      </div>
       {newEvent && <NameDialog title="New event" label="Event name" initial="" cta="Create event" onClose={() => setNewEvent(false)}
-        onSave={async (n) => { await api.createEvent(n); reload(); }} />}
-      {rename && <NameDialog title="Rename event" label="Event name" initial={rename.name} cta="Save" onClose={() => setRename(null)}
-        onSave={async (n) => { await api.renameEvent(rename.id, n); reload(); }} />}
-      {form && <ListForm event={form.event} list={form.list} onClose={() => setForm(null)} onSaved={() => { setForm(null); reload(); toast('List saved.'); }} />}
-
-      {act?.kind === 'open' && (
-        <ConfirmDialog title={`Open “${act.list.title}”?`} confirmLabel="Open registration"
-          body={<p>Members will be able to mark attendance straight away. Other lists that are already open stay open.</p>}
-          onClose={() => setAct(null)} onConfirm={async () => { await api.openListById(act.list.id); toast('Registration is open.'); reload(); }} />
-      )}
-      {act?.kind === 'close' && (
-        <ConfirmDialog title={`Close “${act.list.title}”?`} danger confirmLabel="Close registration"
-          body={<p>Nobody will be able to mark attendance for this list afterwards. You can re-open it later if needed.</p>}
-          onClose={() => setAct(null)} onConfirm={async () => { await api.closeList(act.list.id); toast('Registration closed.'); reload(); }} />
-      )}
-      {act?.kind === 'archive' && (
-        <ConfirmDialog title={`Archive “${act.list.title}”?`} confirmLabel="Archive"
-          body={<p>The list moves out of the way (reviewers stop seeing it) but nothing is deleted. You can restore it any time.</p>}
-          onClose={() => setAct(null)} onConfirm={async () => { await api.archiveList(act.list.id); toast('Archived.'); reload(); }} />
-      )}
-      {act?.kind === 'delete' && (
-        <ConfirmDialog title="Delete this list for good?" danger confirmLabel="Delete forever" typeToConfirm={act.list.title}
-          body={<><p><b>This cannot be undone.</b> The list and every attendance record in it will be permanently deleted. The deletion is written to the audit log.</p></>}
-          onClose={() => setAct(null)} onConfirm={async () => { await api.deleteList(act.list.id, act.list.title); toast('List deleted.'); reload(); }} />
-      )}
-      {evAct?.kind === 'archive' && (
-        <ConfirmDialog title={`Archive “${evAct.event.name}”?`} confirmLabel="Archive event"
-          body={<p>The event is hidden from this page (tick “Show archived” to see it). Nothing is deleted, and you can restore it any time. An event with an open list cannot be archived.</p>}
-          onClose={() => setEvAct(null)} onConfirm={async () => { await api.archiveEvent(evAct.event.id); toast('Event archived.'); reload(); }} />
-      )}
-      {evAct?.kind === 'delete' && (
-        <ConfirmDialog title="Delete this event and everything in it?" danger confirmLabel="Delete everything" typeToConfirm={evAct.event.name}
-          body={<>
-            <Alert>
-              <b>Warning: this cannot be undone.</b> Deleting “{evAct.event.name}” permanently deletes
-              {' '}{evAct.lists ? <>its <b>{evAct.lists} list{evAct.lists === 1 ? '' : 's'}</b> and <b>every attendance record</b> in {evAct.lists === 1 ? 'it' : 'them'}</> : 'the event'},
-              {' '}and any reviewer access given for it. Exports you already downloaded are not affected.
-            </Alert>
-            <p>The deletion is written to the audit log (with how many lists and records were removed). If you may need the data, export it first.</p>
-          </>}
-          onClose={() => setEvAct(null)} onConfirm={async () => { await api.deleteEvent(evAct.event.id, evAct.event.name); toast('Event deleted.'); reload(); }} />
-      )}
+        onSave={async (n) => { await api.createEvent(n); reload(); toast('Event created.'); }} />}
     </div>
   );
 }
 
-function NameDialog({ title, label, initial, cta, onSave, onClose }: {
+export function NameDialog({ title, label, initial, cta, onSave, onClose }: {
   title: string; label: string; initial: string; cta: string; onSave: (n: string) => Promise<void>; onClose: () => void;
 }) {
   const [v, setV] = useState(initial);
@@ -172,7 +87,7 @@ function NameDialog({ title, label, initial, cta, onSave, onClose }: {
   );
 }
 
-function ListForm({ event, list, onClose, onSaved }: { event: EventRow; list: ListRow | null; onClose: () => void; onSaved: () => void }) {
+export function ListForm({ event, list, onClose, onSaved }: { event: EventRow; list: ListRow | null; onClose: () => void; onSaved: () => void }) {
   const { areas } = useLookups();
   const [title, setTitle] = useState(list?.title ?? '');
   const [allowed, setAllowed] = useState<string[]>(list?.allowed_area_ids ?? []);

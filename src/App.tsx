@@ -21,6 +21,7 @@ import { SignupVenue } from './pages/signups/SignupVenue';
 import { Reviewer } from './pages/reviewer/Reviewer';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Lists } from './pages/admin/Lists';
+import { EventDetail } from './pages/admin/EventDetail';
 import { ListDetail } from './pages/admin/ListDetail';
 import { People } from './pages/admin/People';
 import { Accounts } from './pages/admin/Accounts';
@@ -28,6 +29,11 @@ import { Setup } from './pages/admin/Setup';
 import { Districts } from './pages/admin/Districts';
 import { AuditLog } from './pages/admin/AuditLog';
 import { Exports } from './pages/admin/Exports';
+import { Congregations } from './pages/admin/Congregations';
+import { Duplicates } from './pages/admin/Duplicates';
+import { TrackerEvents } from './pages/trackers/TrackerEvents';
+import { TrackerEventPage } from './pages/trackers/TrackerEventPage';
+import { TrackerGridPage } from './pages/trackers/TrackerGridPage';
 import { Join } from './pages/join/Join';
 import { SignupLists } from './pages/signups/SignupLists';
 import { SignupDetail } from './pages/signups/SignupDetail';
@@ -118,8 +124,14 @@ export default function App() {
         </Route>
         <Route element={<Guard roles={['manager']}><Shell /></Guard>}>
           <Route path="/manage/lists" element={<Lists />} />
+          <Route path="/manage/events/:id" element={<EventDetail />} />
           <Route path="/manage/lists/:id" element={<ListDetail />} />
           <Route path="/manage/exports" element={<Exports />} />
+        </Route>
+        <Route element={<Guard roles={['admin', 'manager', 'list_manager', 'registrar', 'reviewer']}><Shell /></Guard>}>
+          <Route path="/trackers" element={<TrackerEvents />} />
+          <Route path="/trackers/:eventId" element={<TrackerEventPage />} />
+          <Route path="/trackers/:eventId/lists/:listId" element={<TrackerGridPage />} />
         </Route>
         <Route element={<Guard roles={['reviewer']}><Shell /></Guard>}>
           <Route path="/review" element={<Reviewer />} />
@@ -127,11 +139,14 @@ export default function App() {
         <Route element={<Guard roles={['admin']}><Shell /></Guard>}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/lists" element={<Lists />} />
+          <Route path="/admin/events/:id" element={<EventDetail />} />
           <Route path="/admin/lists/:id" element={<ListDetail />} />
           <Route path="/admin/people" element={<People />} />
           <Route path="/admin/accounts" element={<Accounts />} />
           <Route path="/admin/setup" element={<Setup />} />
           <Route path="/admin/districts" element={<Districts />} />
+          <Route path="/admin/congregations" element={<Congregations />} />
+          <Route path="/admin/duplicates" element={<Duplicates />} />
           <Route path="/admin/exports" element={<Exports />} />
           <Route path="/admin/audit" element={<AuditLog />} />
         </Route>

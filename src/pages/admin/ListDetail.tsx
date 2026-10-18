@@ -43,7 +43,7 @@ export function ListDetail() {
     <div className="page wide stack">
       <div className="row between">
         <div>
-          <Link to={`${base}/lists`} className="small">← Events & lists</Link>
+          <Link to={ev ? `${base}/events/${ev.id}` : `${base}/lists`} className="small">← {ev?.name ?? 'Events'}</Link>
           <h1 style={{ margin: '4px 0 0' }}>{list.title}</h1>
           <div className="muted">{ev?.name} <Badge kind={list.status === 'open' ? 'ok' : list.status === 'archived' ? 'warn' : ''}>{list.status}</Badge></div>
         </div>

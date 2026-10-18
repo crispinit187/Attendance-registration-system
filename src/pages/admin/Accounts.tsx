@@ -12,10 +12,11 @@ const ROLE_HELP: Record<string, string> = {
   registrar: 'Registers people at the venue, including people without phones or accounts.',
   reviewer: 'Sees reports and exports for the events or lists you give them.',
   manager: 'Runs the events and sign-up lists you give them: creates lists, opens and closes registration, marks attendance, sees contact numbers and exports. Cannot create events or use Accounts, Setup, Districts or the audit log.',
+  list_manager: 'Runs the tracker lists you give them: adds the date columns, imports spreadsheets, ticks people, adds and removes people from the list and sees phone numbers. Cannot create events or lists.',
   admin: 'Full control.',
 };
 
-const ROLE_LABEL: Record<string, string> = { admin: 'admin', manager: 'event manager', reviewer: 'reviewer', registrar: 'registrar', member: 'member' };
+const ROLE_LABEL: Record<string, string> = { admin: 'admin', manager: 'event manager', list_manager: 'list manager', reviewer: 'reviewer', registrar: 'registrar', member: 'member' };
 
 const STATE_LABEL: Record<AccountState, string> = { pending: 'Pending verification', setup: 'Verified, no details yet', active: 'Active', disabled: 'Disabled' };
 
@@ -35,6 +36,7 @@ export function Accounts() {
   const people = useQuery({ queryKey: ['people'], queryFn: api.allPeople, refetchInterval: 30_000 });
   const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
+  const tevents = useQuery({ queryKey: ['tracker-overview'], queryFn: api.trackerOverview, refetchInterval: 30_000 });
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
   const [inviting, setInviting] = useState(false);
   const [filter, setFilter] = useState('');
@@ -54,6 +56,8 @@ export function Accounts() {
   const signupLists = useQuery({ queryKey: ['signup-lists'], queryFn: api.signupLists, refetchInterval: 30_000 });
   const sname = useMemo(() => new Map((signupLists.data ?? []).map((l) => [l.id, l.title])), [signupLists.data]);
   const lname = useMemo(() => new Map((lists.data ?? []).map((l) => [l.id, l.title])), [lists.data]);
+  const tename = useMemo(() => new Map((tevents.data ?? []).map((e) => [e.id, e.name])), [tevents.data]);
+  const tlname = useMemo(() => new Map((tevents.data ?? []).flatMap((e) => e.lists.map((l) => [l.id, `${e.name}: ${l.title}`] as const))), [tevents.data]);
 
   if (accounts.isLoading) return <div className="page wide"><Loading /></div>;
   const all = accounts.data ?? [];
@@ -93,9 +97,9 @@ export function Accounts() {
                   <td><b>{a.full_name || '—'}</b> {a.disabled && <Badge kind="danger">disabled</Badge>}</td>
                   <td>{a.email}</td>
                   <td><Badge kind={a.role === 'admin' ? 'accent' : ''}>{ROLE_LABEL[a.role] ?? a.role}</Badge>
-                    {(a.role === 'reviewer' || a.role === 'registrar' || a.role === 'manager') && <div className="muted small" style={{ whiteSpace: 'normal' }}>
-                      {a.access_scope === 'all' && a.role !== 'manager' ? 'All events and lists'
-                        : mine.length ? mine.map((g) => (g.event_id ? `Event: ${ename.get(g.event_id)}` : g.list_id ? `List: ${lname.get(g.list_id)}` : `Sign-ups: ${sname.get(g.signup_list_id!)}`)).join(', ') : 'Selected only, none given yet'}</div>}
+                    {(a.role === 'reviewer' || a.role === 'registrar' || a.role === 'manager' || a.role === 'list_manager') && <div className="muted small" style={{ whiteSpace: 'normal' }}>
+                      {a.access_scope === 'all' && a.role !== 'manager' && a.role !== 'list_manager' ? 'All events, lists and trackers'
+                        : mine.length ? mine.map((g) => (g.event_id ? `Event: ${ename.get(g.event_id)}` : g.list_id ? `List: ${lname.get(g.list_id)}` : g.tracker_event_id ? `Tracker event: ${tename.get(g.tracker_event_id)}` : g.tracker_list_id ? `Tracker list: ${tlname.get(g.tracker_list_id)}` : `Sign-ups: ${sname.get(g.signup_list_id!)}`)).join(', ') : 'Selected only, none given yet'}</div>}
                   </td>
                   <td>{(() => {
                     const s = stMap.get(a.id); const k = stateOf(a, s);
@@ -116,9 +120,9 @@ export function Accounts() {
                       const self = a.id === session?.user.id;
                       return (
                         <ActionMenu label={`Actions for ${a.full_name || a.email}`} items={[
-                          { label: 'Access and permissions…', hint: a.access_scope === 'all' && a.role !== 'manager' ? 'Has access to everything' : 'Only what you choose', hidden: !(a.role === 'registrar' || a.role === 'reviewer' || a.role === 'manager'), onClick: () => setGranting(a) },
+                          { label: 'Access and permissions…', hint: a.access_scope === 'all' && a.role !== 'manager' && a.role !== 'list_manager' ? 'Has access to everything' : 'Only what you choose', hidden: !(a.role === 'registrar' || a.role === 'reviewer' || a.role === 'manager' || a.role === 'list_manager'), onClick: () => setGranting(a) },
                           { label: 'Change role…', hint: `Now ${ROLE_LABEL[a.role] ?? a.role}`, hidden: self, onClick: () => setChanging(a) },
-                          { label: 'Link to a person…', hidden: !!a.person_id || a.role === 'reviewer' || a.role === 'manager', onClick: () => setLinking(a) },
+                          { label: 'Link to a person…', hidden: !!a.person_id || a.role === 'reviewer' || a.role === 'manager' || a.role === 'list_manager', onClick: () => setLinking(a) },
                           { label: 'Verify now…', hint: 'Skip the email link', hidden: k !== 'pending', onClick: () => setVerifying(a) },
                           { label: 'Resend invite', hidden: !(k === 'pending' && a.must_set_password), onClick: async () => { try { await api.resendInvite(a.id); toast('Invitation sent again.'); } catch (e) { toast(errMsg(e)); } } },
                           { label: a.disabled ? 'Enable account' : 'Disable account', danger: !a.disabled, hidden: self, onClick: () => setToggle(a) },
@@ -190,11 +194,12 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
       <form className="stack" onSubmit={submit} noValidate>
         <Field label="Role" hint={ROLE_HELP[role]}>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="manager">Event manager</option><option value="reviewer">Reviewer</option><option value="registrar">Registrar</option>
+            <option value="manager">Event manager</option><option value="list_manager">List manager (trackers)</option><option value="reviewer">Reviewer</option><option value="registrar">Registrar</option>
             <option value="member">Member (for someone you already registered)</option><option value="admin">Admin</option>
           </select>
         </Field>
         {role === 'manager' && <Alert kind="info">An event manager works only with the events and sign-up lists you give them. After creating the account, choose them from the ⋯ menu on their row (Access and permissions), or from the event or sign-up list itself.</Alert>}
+        {role === 'list_manager' && <Alert kind="info">A list manager works only with the tracker lists you give them. After creating the account, choose their lists from the ⋯ menu on their row (Access and permissions), or from the tracker event itself.</Alert>}
         {(role === 'reviewer' || role === 'registrar') && (
           <Field label="Access" hint={scope === 'selected' ? 'Choose their events and lists afterwards from the ⋯ menu on their row.' : 'Every event and list, including future ones.'}>
             <select className="input" value={scope} onChange={(e) => setScope(e.target.value as 'all' | 'selected')}>
@@ -244,7 +249,10 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
   const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
   const signups = useQuery({ queryKey: ['signup-lists'], queryFn: api.signupLists, refetchInterval: 30_000 });
+  const tevents = useQuery({ queryKey: ['tracker-overview'], queryFn: api.trackerOverview, refetchInterval: 30_000 });
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
+  const [tev, setTev] = useState('');
+  const [tli, setTli] = useState('');
   const [scope, setScope] = useState<'all' | 'selected'>(account.access_scope);
   const [ev, setEv] = useState('');
   const [li, setLi] = useState('');
@@ -252,11 +260,19 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
   const [busy, setBusy] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);   // the access grant being removed (asks first)
   const isRegistrar = account.role === 'registrar';
-  const isManager = account.role === 'manager';   // always limited to what is selected, events and sign-up lists only
-  const hasSignups = isRegistrar || isManager;
+  const isListMgr = account.role === 'list_manager';   // trackers only, always limited to what is selected
+  const isManager = account.role === 'manager' || isListMgr;   // always limited to what is selected
+  const hasSignups = (isRegistrar || account.role === 'manager');
+  const attendance = !isListMgr;   // list managers only work with trackers
   const mine = (grants.data ?? []).filter((g) => g.account_id === account.id);
   const name = (g: (typeof mine)[number]) => (g.event_id ? `Whole event: ${events.data?.find((e) => e.id === g.event_id)?.name}`
-    : g.list_id ? `List: ${lists.data?.find((l) => l.id === g.list_id)?.title}` : `Sign-up list: ${signups.data?.find((l) => l.id === g.signup_list_id)?.title}`);
+    : g.list_id ? `List: ${lists.data?.find((l) => l.id === g.list_id)?.title}`
+    : g.tracker_event_id ? `Whole tracker event: ${tevents.data?.find((e) => e.id === g.tracker_event_id)?.name}`
+    : g.tracker_list_id ? `Tracker list: ${tevents.data?.flatMap((e) => e.lists.map((l) => ({ ...l, ev: e.name }))).find((l) => l.id === g.tracker_list_id)?.title}`
+    : `Sign-up list: ${signups.data?.find((l) => l.id === g.signup_list_id)?.title}`);
+  const addT = async (event: string | null, list: string | null) => {
+    try { await api.grantTracker(account.id, event, list); onChanged(); void grants.refetch(); setTev(''); setTli(''); } catch (e) { toast(errMsg(e)); }
+  };
   const add = async (event: string | null, list: string | null, signup: string | null) => {
     try { await api.grant(account.id, event, list, signup); onChanged(); void grants.refetch(); setEv(''); setLi(''); setSl(''); } catch (e) { toast(errMsg(e)); }
   };
@@ -272,7 +288,7 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
         {!isManager && <div className="stack" style={{ gap: 8 }}>
           <b className="small">What can this {account.role} work with?</b>
           <label className="check"><input type="radio" name="scope" checked={scope === 'all'} disabled={busy} onChange={() => void change('all')} />
-            <span><b>All events and lists</b><br /><span className="hint">Everything, including future ones{isRegistrar ? ', and every sign-up list' : ''}.</span></span></label>
+            <span><b>All events, lists and trackers</b><br /><span className="hint">Everything, including future ones{isRegistrar ? ', and every sign-up list' : ''}.</span></span></label>
           <label className="check"><input type="radio" name="scope" checked={scope === 'selected'} disabled={busy} onChange={() => void change('selected')} />
             <span><b>Only what I select</b><br /><span className="hint">Just the events and lists you add below{hasSignups ? ' (sign-up lists too)' : ''}. You can add or remove them at any time.</span></span></label>
         </div>}
@@ -285,13 +301,21 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
               <div className="item" key={g.id}><div className="grow">{name(g)}</div>
                 <button className="btn small danger" onClick={() => setRevoking(g.id)}>Remove</button></div>
             ))}
-            <Field label="Give access to a whole event (all its lists, now and later)">
+            {attendance && <Field label="Give access to a whole event (all its lists, now and later)">
               <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
                 <button className="btn" disabled={!ev} onClick={() => add(ev, null, null)}>Add</button></div>
-            </Field>
-            {!isManager && <Field label="Or to one list only">
+            </Field>}
+            {attendance && !isManager && <Field label="Or to one list only">
               <div className="row"><select className="input grow" value={li} onChange={(e) => setLi(e.target.value)}><option value="">Choose list…</option>{lists.data?.filter((l) => l.status !== 'archived').map((l) => <option key={l.id} value={l.id}>{events.data?.find((e) => e.id === l.event_id)?.name}: {l.title}</option>)}</select>
                 <button className="btn" disabled={!li} onClick={() => add(null, li, null)}>Add</button></div>
+            </Field>}
+            <Field label="Tracker events (all their lists, now and later)">
+              <div className="row"><select className="input grow" value={tev} onChange={(e) => setTev(e.target.value)}><option value="">Choose tracker event…</option>{tevents.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
+                <button className="btn" disabled={!tev} onClick={() => addT(tev, null)}>Add</button></div>
+            </Field>
+            {account.role !== 'manager' && <Field label="Or one tracker list only">
+              <div className="row"><select className="input grow" value={tli} onChange={(e) => setTli(e.target.value)}><option value="">Choose tracker list…</option>{tevents.data?.filter((e) => !e.archived_at).flatMap((e) => e.lists.map((l) => <option key={l.id} value={l.id}>{e.name}: {l.title}</option>))}</select>
+                <button className="btn" disabled={!tli} onClick={() => addT(null, tli)}>Add</button></div>
             </Field>}
             {hasSignups && (
               <Field label="Sign-up lists">
@@ -323,16 +347,17 @@ function RoleDialog({ account, grants, onClose, onChanged }: { account: Account;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const name = account.full_name || account.email || 'This account';
-  const kept = (r: string) => grants.filter((g) => !(r === 'admin' || r === 'member' || (r === 'manager' && g.list_id) || (r === 'reviewer' && g.signup_list_id)));
+  const kept = (r: string) => grants.filter((g) => !(r === 'admin' || r === 'member' || (r === 'manager' && (g.list_id || g.tracker_list_id)) || (r === 'list_manager' && (g.event_id || g.list_id || g.signup_list_id)) || (r === 'reviewer' && g.signup_list_id)));
   const effect = (r: string) => {
     if (r === 'admin') return 'They get full control of the system. Any access they were given is cleared because admins do not need it.';
     if (r === 'member') return `They will only mark their own attendance by scanning. All access they were given is removed${grants.length ? ` (${grants.length} item${grants.length === 1 ? '' : 's'})` : ''}. If they have no personal details yet, they are asked for them next time they sign in.`;
     const lost = grants.length - kept(r).length;
-    const base = r === 'manager' ? 'They work only with the events and sign-up lists you give them.'
+    const base = r === 'manager' ? 'They work only with the events, sign-up lists and tracker events you give them.'
+      : r === 'list_manager' ? 'They work only with the tracker lists you give them.'
       : r === 'reviewer' ? 'They see reports and exports for what you give them.' : 'They register people at the venue.';
     const keep = kept(r).length ? ` ${kept(r).length} access item${kept(r).length === 1 ? ' is' : 's are'} kept.` : '';
-    const drop = lost ? ` ${lost} item${lost === 1 ? '' : 's'} the new role cannot use ${lost === 1 ? 'is' : 'are'} removed (${r === 'manager' ? 'single lists' : 'sign-up lists'}).` : '';
-    const scopeNote = r === 'manager' ? ' They always see only what you select.' : account.role === 'member' || account.role === 'admin' ? (r === 'reviewer' ? ' Reviewers start with only what you select, so choose their access next.' : ' Registrars start with access to everything; change that from Access and permissions if needed.') : '';
+    const drop = lost ? ` ${lost} item${lost === 1 ? '' : 's'} the new role cannot use ${lost === 1 ? 'is' : 'are'} removed (${r === 'manager' ? 'single lists' : r === 'list_manager' ? 'attendance events, lists and sign-up lists' : 'sign-up lists'}).` : '';
+    const scopeNote = r === 'manager' || r === 'list_manager' ? ' They always see only what you select.' : account.role === 'member' || account.role === 'admin' ? (r === 'reviewer' ? ' Reviewers start with only what you select, so choose their access next.' : ' Registrars start with access to everything; change that from Access and permissions if needed.') : '';
     return base + keep + drop + scopeNote;
   };
   const go = async () => {
@@ -348,7 +373,7 @@ function RoleDialog({ account, grants, onClose, onChanged }: { account: Account;
         <Field label="New role">
           <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="">Choose a role…</option>
-            {['admin', 'manager', 'reviewer', 'registrar', 'member'].filter((r) => r !== account.role).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]?.replace(/^./, (c) => c.toUpperCase())}</option>)}
+            {['admin', 'manager', 'list_manager', 'reviewer', 'registrar', 'member'].filter((r) => r !== account.role).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]?.replace(/^./, (c) => c.toUpperCase())}</option>)}
           </select>
         </Field>
         {role && <Alert kind={role === 'admin' ? 'warn' : 'info'}>{effect(role)}</Alert>}
