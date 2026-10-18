@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 const paths: Record<string, string> = {
@@ -78,13 +79,15 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
-  return (
+  // Drawn on the page itself, not inside whatever opened it (the top bar blurs and would trap a fixed dialog).
+  return createPortal(
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
