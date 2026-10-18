@@ -10,6 +10,8 @@ import { Alert, Badge, Field, Icon, Loading, Modal, useToast } from '../../compo
 import { DistrictInput } from '../../components/DistrictInput';
 import { TrackerAnalytics } from '../../components/TrackerAnalytics';
 import { ImportDialog } from './ImportDialog';
+import { FollowUpDialog } from '../../components/FollowUp';
+import { enqueue, flush, isNetworkError, newId, queued, queuedTicks, withCache } from '../../lib/offline';
 
 const gridKey = (list: string) => ['tracker-grid', list];
 const shown = (r: { title: string | null; title_specify: string | null; name: string }) =>
@@ -41,7 +43,8 @@ export function TrackerGridPage() {
   const q = useQuery({
     queryKey: gridKey(listId),
     queryFn: async () => {
-      let g = await api.trackerGrid(listId);
+      let g = await withCache(`grid:${listId}`, () => api.trackerGrid(listId));   // with no connection, the last copy is shown
+      for (const t of queuedTicks(listId)) g = patch(g, t.entry, t.date, t.on);   // ticks saved on this device, not sent yet
       for (const [k, on] of pending.current) { const [e, d] = k.split('|'); g = patch(g, e!, d!, on); }   // keep ticks that are still being saved
       return g;
     },
@@ -53,7 +56,7 @@ export function TrackerGridPage() {
   const [debounced, setDebounced] = useState('');
   const [showRemoved, setShowRemoved] = useState(false);
   const [pick, setPick] = useState<Set<string> | null>(null);   // dates to tick for a new person; null = latest date only
-  const [dlg, setDlg] = useState<null | 'date' | 'import' | 'create' | 'export'>(null);
+  const [dlg, setDlg] = useState<null | 'date' | 'import' | 'create' | 'export' | 'followup'>(null);
   const [rowDlg, setRowDlg] = useState<TrackerRow | null>(null);
   const [dateDlg, setDateDlg] = useState<TrackerDate | null>(null);
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 250); return () => clearTimeout(t); }, [search]);
@@ -81,8 +84,16 @@ export function TrackerGridPage() {
     const k = `${row.entry_id}|${date.id}`;
     pending.current.set(k, on);
     qc.setQueryData<TrackerGrid>(gridKey(listId), (old) => (old ? patch(old, row.entry_id, date.id, on) : old));
+    const hold = () => {
+      enqueue({ id: newId(), kind: 'tick', at: new Date().toISOString(), label: `${on ? 'Ticked' : 'Unticked'} ${row.name} on ${fmtD(date.on_date)}`, list: listId, entry: row.entry_id, date: date.id, on });
+      pending.current.delete(k);
+      void flush(reload);
+    };
+    // If anything is already waiting to be sent, join the queue so ticks are applied in the order they were made.
+    if (queued().length || !navigator.onLine) { hold(); return; }
     try { await api.trackerMark(row.entry_id, date.id, on); }
     catch (e) {
+      if (isNetworkError(e)) { hold(); return; }
       pending.current.delete(k);
       qc.setQueryData<TrackerGrid>(gridKey(listId), (old) => (old ? patch(old, row.entry_id, date.id, !on) : old));
       toast(errMsg(e));
@@ -118,6 +129,7 @@ export function TrackerGridPage() {
           <div className="row">
             {perms.manage && <button className="btn" onClick={() => setDlg('date')}><Icon name="plus" size={16} />Add date</button>}
             {canImport && !g.list.archived && <button className="btn" onClick={() => setDlg('import')}><Icon name="down" size={16} />Import</button>}
+            {g.dates.some((d) => !d.removed) && <button className="btn" onClick={() => setDlg('followup')}><Icon name="phone" size={16} />Absent</button>}
             {canExport && <button className="btn" onClick={() => setDlg('export')}>Export</button>}
           </div>
         </div>
@@ -164,7 +176,7 @@ export function TrackerGridPage() {
           <thead>
             <tr>
               <th className="sticky1">Name</th>
-              <th className="hide-sm">Voice</th><th className="hide-sm">District</th><th className="hide-sm">Congregation</th>
+              <th className="hide-sm">Voice</th><th className="hide-sm">Area</th><th className="hide-sm">District</th><th className="hide-sm">Congregation</th>
               {perms.contact && <th className="hide-sm">Phone</th>}
               {dates.map((d) => (
                 <th key={d.id} className="dcol" title={d.title ?? undefined} style={d.removed ? { opacity: .5 } : undefined}>
@@ -185,7 +197,7 @@ export function TrackerGridPage() {
                     <button className="namebtn" onClick={() => setRowDlg(r)} title="Open">{shown(r)}</button>
                     {r.removed && <> <Badge kind="warn">removed</Badge></>}
                   </td>
-                  <td className="hide-sm">{r.voice}</td><td className="hide-sm">{r.district}</td><td className="hide-sm">{r.congregation}</td>
+                  <td className="hide-sm">{r.voice}</td><td className="hide-sm">{r.area}</td><td className="hide-sm">{r.district}</td><td className="hide-sm">{r.congregation}</td>
                   {perms.contact && <td className="hide-sm">{r.contact}</td>}
                   {dates.map((d) => (
                     <td key={d.id} className="dcol">
@@ -199,12 +211,12 @@ export function TrackerGridPage() {
                 </tr>
               );
             })}
-            {!rows.length && <tr><td className="muted" colSpan={5 + dates.length + (perms.contact ? 1 : 0)}>{g.rows.length ? 'No one matches that name.' : perms.mark ? 'Nobody on this list yet. Search a name above to add the first person, or import a spreadsheet.' : 'Nobody on this list yet.'}</td></tr>}
+            {!rows.length && <tr><td className="muted" colSpan={6 + dates.length + (perms.contact ? 1 : 0)}>{g.rows.length ? 'No one matches that name.' : perms.mark ? 'Nobody on this list yet. Search a name above to add the first person, or import a spreadsheet.' : 'Nobody on this list yet.'}</td></tr>}
           </tbody>
           {dates.length > 0 && rows.length > 0 && (
             <tfoot>
               <tr>
-                <td className="sticky1">Present</td><td className="hide-sm" /><td className="hide-sm" /><td className="hide-sm" />{perms.contact && <td className="hide-sm" />}
+                <td className="sticky1">Present</td><td className="hide-sm" /><td className="hide-sm" /><td className="hide-sm" /><td className="hide-sm" />{perms.contact && <td className="hide-sm" />}
                 {dates.map((d, i) => <td key={d.id} className="dcol">{totals[i]}</td>)}
                 <td />
               </tr>
@@ -219,6 +231,7 @@ export function TrackerGridPage() {
 
       {dlg === 'date' && <DateDialog listId={listId} multi={(evq.data?.lists.length ?? 1) > 1} onClose={() => setDlg(null)} onDone={reload} />}
       {dlg === 'import' && <ImportDialog eventId={eventId} listId={listId} eventName={g.list.event_name} dates={liveDates} onClose={() => setDlg(null)} onDone={reload} />}
+      {dlg === 'followup' && <FollowUpDialog grid={g} onClose={() => setDlg(null)} />}
       {dlg === 'export' && <ExportDialog eventId={eventId} listId={listId} eventName={g.list.event_name} canContact={perms.contact} grid={g} onClose={() => setDlg(null)} />}
       {dlg === 'create' && <CreateDialog listId={listId} name={typed} dates={liveDates} chosen={chosen} onClose={() => setDlg(null)}
         onDone={() => { setSearch(''); setDlg(null); reload(); }} />}

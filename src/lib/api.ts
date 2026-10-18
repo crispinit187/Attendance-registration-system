@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type {
-  Account, AccountStatus, DuplicatePair, ImportMap, ImportResult, ImportRowIn, TrackerAnalytics, TrackerCard, TrackerEvent, TrackerGrid, TrackerPersonInput, AttendanceRow, AuditRow, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
+  Account, AccountStatus, DuplicatePair, ImportMap, ImportResult, ImportRowIn, TrackerAnalytics, TrackerCard, TrackerEvent, TrackerGrid, TrackerPersonInput, AttendanceRow, AuditFilter, AuditRow, LateMark, PersonHistory, RecentAction, SyncResult, Breakdown, DistrictGroup, EventRow, Grant, HistoryRow, ListRow,
   Lookup, OpenList, PasteResult, PasteRowIn, Person, PersonCard, PresentRow, ProfileInput, QrPayload,
   SignupDetailInfo, SignupEntry, SignupListRow, SignupMatch, SignupQrPayload, TeamMember,
 } from './types';
@@ -159,6 +159,14 @@ export const api = {
   districts: () => rpc<DistrictGroup[]>('district_overview'),
   renameDistrict: (id: string, name: string) => rpc('rename_district', { p_id: id, p_name: name }),
   mergeDistricts: (from: string, to: string) => rpc('merge_districts', { p_from: from, p_to: to }),
+  auditSearch: (f: AuditFilter) => rpc<AuditRow[]>('audit_search', { p_q: f.q || null, p_action: f.action || null, p_from: f.from || null, p_to: f.to || null, p_limit: f.limit ?? 300 }),
+  recentActions: () => rpc<RecentAction[]>('my_recent_actions', { p_limit: 40 }),
+  undoAction: (id: string) => rpc('undo_action', { p_id: id }),
+  trackerSync: (ops: unknown[]) => rpc<SyncResult[]>('tracker_sync_marks', { p_ops: ops }),
+  attendanceSync: (ops: unknown[]) => rpc<SyncResult[]>('attendance_sync', { p_ops: ops }),
+  lateMarks: (status = 'pending') => rpc<LateMark[]>('late_marks_list', { p_status: status }),
+  decideLate: (id: string, approve: boolean) => rpc('decide_late_mark', { p_id: id, p_approve: approve }),
+  personHistory: (id: string) => rpc<PersonHistory>('person_history', { p_person: id }),
   audit: (limit = 300) => must<AuditRow[]>(supabase.from('audit_log').select('*').order('at', { ascending: false }).limit(limit)),
   logExport: (scope: 'list' | 'event' | 'signup' | 'tracker_event' | 'tracker_list', target: string, format: string, details: Record<string, unknown> = {}) =>
     rpc('log_export', { p_scope: scope, p_target: target, p_format: format, p_details: details }),

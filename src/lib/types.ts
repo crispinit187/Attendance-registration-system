@@ -162,3 +162,17 @@ export interface DuplicateSide {
   area: string | null; district: string | null; congregation: string | null; voice_part: string | null; contact: string | null; has_account: boolean;
 }
 export interface DuplicatePair { a: DuplicateSide; b: DuplicateSide; same_contact: boolean; similarity: number }
+
+export interface RecentAction { id: string; at: string; kind: string; label: string; undone: boolean; can_undo: boolean }
+export interface LateMark {
+  id: string; status: 'pending' | 'approved' | 'rejected'; at: string; submitted_at: string; submitted_by: string | null;
+  person: string; person_id: string; list_id: string; list: string; event: string; opened_at: string | null; closed_at: string | null; list_status: string;
+}
+export type SyncStatus = 'ok' | 'marked' | 'already' | 'duplicate' | 'needs_approval' | 'was_removed' | 'error';
+export interface SyncResult { i: number; status: SyncStatus; message?: string }
+export interface PersonHistory {
+  person: Record<string, unknown>;
+  attendance: { id: string; event: string; list: string; marked_at: string; method: string; removed: boolean }[];
+  trackers: { event: string; list: string; removed: boolean; dates: number; ticks: number; marks: { on_date: string; title: string | null; marked_at: string }[] }[];
+}
+export interface AuditFilter { q?: string; action?: string; from?: string; to?: string; limit?: number }

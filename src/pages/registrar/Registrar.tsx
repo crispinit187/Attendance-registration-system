@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth';
 import { errMsg, fmtTime } from '../../lib/format';
 import type { PersonCard } from '../../lib/types';
 import { Alert, ConfirmDialog, Icon, Loading, useToast } from '../../components/ui';
+import { enqueue, flush, isNetworkError, newId, recall, remember, useOfflineState, withCache } from '../../lib/offline';
 import { AddPerson } from '../../components/AddPerson';
 import { HeaderActions } from '../../components/Shell';
 
@@ -22,7 +23,7 @@ export function Registrar() {
 
   useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
 
-  const opens = useQuery({ queryKey: ['open-lists'], queryFn: api.openLists, refetchInterval: 15_000 });
+  const opens = useQuery({ queryKey: ['open-lists'], queryFn: () => withCache('open-lists', api.openLists), refetchInterval: 15_000 });
   const signups = useQuery({ queryKey: ['signup-lists'], queryFn: api.signupLists, refetchInterval: 15_000 });
   const openSignups = (signups.data ?? []).filter((l) => l.status === 'open');
   const [pick, setPick] = useState<string | null>(null);
@@ -32,20 +33,41 @@ export function Registrar() {
   const listId = current?.id ?? null;
   const present = useQuery({
     queryKey: ['present', listId, true], enabled: !!listId, refetchInterval: 8_000,
-    queryFn: () => api.listPresent(listId!, true),
+    queryFn: () => withCache(`present:${listId}`, () => api.listPresent(listId!, true)),
   });
   const results = useQuery({
     queryKey: ['search', dq, listId, present.dataUpdatedAt], enabled: dq.length >= 3 && !!listId,
-    queryFn: () => api.searchPeople(dq, listId),
+    queryFn: async () => {
+      try {
+        const r = await api.searchPeople(dq, listId);
+        // Keep the people seen on this list, so they can still be found and marked with no connection.
+        const seen = new Map((recall<PersonCard[]>(`roster:${listId}`) ?? []).map((p) => [p.id, p]));
+        r.forEach((p) => seen.set(p.id, p));
+        remember(`roster:${listId}`, [...seen.values()].slice(-400));
+        return r;
+      } catch (e) {
+        if (!isNetworkError(e)) throw e;
+        const w = dq.toLowerCase().split(/\s+/);
+        return (recall<PersonCard[]>(`roster:${listId}`) ?? []).filter((p) => w.every((x) => p.display_name.toLowerCase().includes(x))).slice(0, 20);
+      }
+    },
   });
+  const off = useOfflineState();
+  const waiting = new Map(off.queue.filter((m) => m.kind === 'att' && m.list === listId).map((m) => [m.kind === 'att' ? m.person : '', m]));
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['present'] }); void qc.invalidateQueries({ queryKey: ['search'] }); void qc.invalidateQueries({ queryKey: ['open-lists'] }); };
 
   const mark = async (p: PersonCard) => {
+    const hold = () => {
+      enqueue({ id: newId(), kind: 'att', at: new Date().toISOString(), label: `${p.display_name}: ${current?.title ?? 'list'}`, list: listId!, person: p.id });
+      toast(`${p.display_name} saved on this device. It will be sent when you are online.`);
+      void flush(refresh);
+    };
+    if (waiting.size || !navigator.onLine) { hold(); return; }
     try {
       const r = await api.markManual(listId!, p.id);
       toast(r.status === 'already' ? `${p.display_name} was already marked.` : `${p.display_name} marked present.`);
       refresh();
-    } catch (e) { toast(errMsg(e)); }
+    } catch (e) { if (isNetworkError(e)) hold(); else toast(errMsg(e)); }
   };
 
   const rows = present.data ?? [];
@@ -113,7 +135,8 @@ export function Registrar() {
                     <div className="muted" style={{ fontSize: 13 }}>{[p.area, p.district].filter(Boolean).join(' - ')}</div>
                     <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{p.has_account ? 'Has an account' : 'No account yet'}</div>
                   </div>
-                  {p.present ? (recent
+                  {waiting.has(p.id) ? <button className="btn" style={{ minWidth: 104, color: 'var(--muted)' }} disabled>Waiting to send</button>
+                    : p.present ? (recent
                     ? <button className="btn accent-outline" style={{ minWidth: 104 }} onClick={async () => { try { await api.undo(att!.att_id); toast('Un-marked.'); refresh(); } catch (e) { toast(errMsg(e)); } }}>Undo</button>
                     : <button className="btn" style={{ minWidth: 104, color: 'var(--muted)' }} disabled>Present</button>)
                     : p.was_removed ? <button className="btn" style={{ minWidth: 104, color: 'var(--muted)' }} disabled>Removed</button>

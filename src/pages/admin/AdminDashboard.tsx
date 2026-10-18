@@ -10,6 +10,7 @@ import { download, errMsg, safeName } from '../../lib/format';
 import { useLookups } from '../../lib/auth';
 import type { ListRow } from '../../lib/types';
 import { Alert, ConfirmDialog, Loading, useToast } from '../../components/ui';
+import { LateMarks } from '../../components/LateMarks';
 
 const H2 = { margin: '0 0 4px', fontSize: 16, fontFamily: 'var(--font)', fontWeight: 600 } as const;
 
@@ -79,6 +80,7 @@ export function AdminDashboard() {
         <Link to={eventId ? `/admin/lists?new=${eventId}` : '/admin/lists'} className="btn primary" style={{ borderRadius: 12 }}>Create list</Link>
       </div>
       {err && <Alert>{errMsg(err)}</Alert>}
+      <LateMarks />
 
       {openRow && (
         <section className="card live row between" style={{ padding: 22, gap: 18 }} aria-label="Open list">

@@ -7,7 +7,7 @@ import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './components/ui';
 
 const client = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true, staleTime: 5_000 } },
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true, staleTime: 5_000, networkMode: 'always' } },
 });
 
 createRoot(document.getElementById('root')!).render(
@@ -21,3 +21,8 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// Lets the app open with no connection. Only on the real site, not while developing.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('./sw.js').catch(() => { /* not available: the app still works online */ }); });
+}

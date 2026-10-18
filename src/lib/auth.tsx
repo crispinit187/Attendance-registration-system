@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
+import { clearOffline } from './offline';
 import { supabase } from './supabase';
 import { api } from './api';
 import type { Account, Person } from './types';
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       await load(data.session);
     },
-    signOut: async () => { await supabase.auth.signOut(); setAccount(null); setPerson(null); },
+    signOut: async () => { clearOffline(); await supabase.auth.signOut(); setAccount(null); setPerson(null); },
   }), [loading, session, account, person, load]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

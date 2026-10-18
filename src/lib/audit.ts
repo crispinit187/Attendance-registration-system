@@ -67,6 +67,9 @@ export function describeAudit(r: AuditRow): { what: string; why: string } {
     case 'person.restore': return { what: `restored ${s(d.person)}`, why: '' };
     case 'person.delete': return { what: `deleted ${s(d.person)}`, why: '' };
     case 'person.merge': return { what: `merged ${s(d.merged)} into ${s(d.kept)}`, why: '' };
+    case 'late_mark.approve': return { what: `approved a late mark for ${s(d.person)} on ${s(d.list_title)}`, why: `Marked by ${s(d.marked_by)} at ${s(d.at)}` };
+    case 'late_mark.reject': return { what: `rejected a late mark for ${s(d.person)} on ${s(d.list_title)}`, why: `Marked by ${s(d.marked_by)}` };
+    case 'action.undo': return { what: `undid: ${s(d.what)}`, why: '' };
     case 'district.rename': return { what: `renamed district ${s(d.from)} to ${s(d.to)}`, why: '' };
     case 'district.merge': return { what: `merged district ${s(d.merged)} into ${s(d.into)}`, why: '' };
     default: return { what: r.action.replace('.', ' '), why: Object.entries(d).filter(([, v]) => typeof v !== 'object').map(([k, v]) => `${k}: ${s(v)}`).join(' · ') };

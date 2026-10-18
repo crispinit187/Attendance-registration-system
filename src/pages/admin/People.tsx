@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
@@ -8,6 +8,7 @@ import type { Person, PersonCard, ProfileInput } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 import { PersonForm, profileFromPerson } from '../../components/PersonForm';
 import { useLookups } from '../../lib/auth';
+import { PersonHistoryDialog } from '../../components/PersonHistory';
 
 export function People() {
   const qc = useQueryClient();
@@ -17,7 +18,9 @@ export function People() {
   const groups = useQuery({ queryKey: ['district-groups'], queryFn: async () => (await supabase.from('district_groups').select('id,name')).data as { id: string; name: string }[] ?? [] });
   const cgroups = useQuery({ queryKey: ['congregation-groups'], queryFn: async () => (await supabase.from('congregation_groups').select('id,name')).data as { id: string; name: string }[] ?? [] });
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts, refetchInterval: 30_000 });
-  const [q, setQ] = useState('');
+  const [sp] = useSearchParams();
+  const [q, setQ] = useState(sp.get('q') ?? '');
+  const [hist, setHist] = useState<Person | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [edit, setEdit] = useState<Person | 'new' | null>(null);
   const [merge, setMerge] = useState<Person | null>(null);
@@ -71,6 +74,7 @@ export function People() {
                   : <span className="muted">none</span>}</td>
                 <td className="row" style={{ flexWrap: 'nowrap' }}>
                   <button className="btn small" onClick={() => setEdit(p)}>Edit</button>
+                  <button className="btn small ghost" onClick={() => setHist(p)}>History</button>
                   <button className="btn small ghost" onClick={() => setMerge(p)}>Merge…</button>
                   {p.archived
                     ? <button className="btn small" onClick={async () => { try { await api.restorePerson(p.id); reload(); } catch (e) { toast(errMsg(e)); } }}>Restore</button>
@@ -84,6 +88,7 @@ export function People() {
         </table>
       </div>
 
+      {hist && <PersonHistoryDialog id={hist.id} name={hist.full_name} onClose={() => setHist(null)} />}
       {edit && (
         <Modal title={edit === 'new' ? 'New person' : 'Edit person'} onClose={() => setEdit(null)}>
           <PersonForm staff

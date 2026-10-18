@@ -1,10 +1,15 @@
 import { useLiveSync } from '../lib/live';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { BrandLabel, Icon } from './ui';
 import { SignOutButton } from './SignOut';
+import { OfflineBar } from './OfflineBar';
+import { RecentActionsButton } from './RecentActions';
+import { SearchButton, SearchHost } from './GlobalSearch';
+import { useAutoFlush } from '../lib/offline';
 
 interface Item { to: string; label: string; icon: string; end?: boolean }
 const MEMBER: Item[] = [
@@ -47,13 +52,22 @@ const REGISTRAR = [
 
 export function HeaderActions() {
   const { theme, toggle } = useTheme();
+  const { account } = useAuth();
+  const role = account?.role ?? 'member';
   return (
     <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+      {role !== 'member' && <SearchButton />}
+      {['admin', 'manager', 'list_manager', 'registrar'].includes(role) && <RecentActionsButton />}
       <button className="iconbtn" onClick={toggle} aria-label="Switch between light and dark" title="Light / dark"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
       <SignOutButton className="iconbtn" label="Sign out" title="Sign out"><Icon name="out" /></SignOutButton>
     </div>
   );
 }
+
+const pagesFor = (role: string): { to: string; label: string }[] =>
+  role === 'admin' ? ADMIN : role === 'manager' ? MANAGER : role === 'list_manager' ? LISTMGR
+    : role === 'registrar' ? [{ to: '/registrar', label: 'Mark attendance' }, { to: '/trackers', label: 'Trackers' }, { to: '/signups', label: 'Sign-ups' }]
+      : role === 'reviewer' ? [{ to: '/review', label: 'Attendance' }, { to: '/trackers', label: 'Trackers' }] : [];
 
 const jump = (id: string) => {
   if (id.endsWith('-top')) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -61,20 +75,24 @@ const jump = (id: string) => {
 };
 
 export function Shell() {
-  const { account } = useAuth();
+  const { account, session } = useAuth();
+  const qc = useQueryClient();
   useLiveSync();
+  useAutoFlush(session?.user.id ?? '', useCallback(() => { void qc.invalidateQueries(); }, [qc]));
   const role = account?.role ?? 'member';
   const [active, setActive] = useState('');
   const loc = useLocation();
   const nav = useNavigate();
   const onRegistrar = loc.pathname === '/registrar';
   const name = account?.full_name || account?.email || '';
+  const done = useCallback(() => { void qc.invalidateQueries(); }, [qc]);
 
   // Member and registrar: header lives inside each page, tabs at the bottom.
   if (role === 'member') {
     return (
       <div className="shell">
         <Outlet />
+        <OfflineBar onDone={done} />{role !== 'member' && <SearchHost pages={pagesFor(role)} />}
         <nav className="bottomnav" aria-label="Main">
           {MEMBER.map((i) => (
             <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}><Icon name={i.icon} size={22} />{i.label}</NavLink>
@@ -87,6 +105,7 @@ export function Shell() {
     return (
       <div className="shell">
         <Outlet />
+        <OfflineBar onDone={done} /><SearchHost pages={pagesFor(role)} />
         <nav className="bottomnav" aria-label="Main">
           {REGISTRAR.map((i) => (
             <button key={i.id} className={onRegistrar && (active === i.id || (!active && i.id === 'rg-mark')) ? 'active' : ''}
@@ -121,6 +140,7 @@ export function Shell() {
         </header>
         <Outlet />
       </div>
+      <OfflineBar onDone={done} /><SearchHost pages={pagesFor(role)} />
       {items && (
         <nav className="bottomnav" aria-label="Sections" style={{ overflowX: 'auto', justifyContent: 'flex-start' }}>
           {items.map((i) => (

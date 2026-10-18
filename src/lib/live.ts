@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabase';
 
 /** Tables whose changes should refresh the screens. Supabase sends each person only the rows their role may see. */
-const TABLES = ['attendance', 'signup_entries', 'signup_lists', 'lists', 'events', 'people', 'accounts', 'audit_log',
+const TABLES = ['attendance', 'signup_entries', 'signup_lists', 'lists', 'events', 'people', 'accounts', 'audit_log', 'late_marks',
   'tracker_events', 'tracker_lists', 'tracker_dates', 'tracker_entries', 'tracker_marks'];
 
 /**

@@ -125,3 +125,14 @@ A separate **Trackers** section for events where people are ticked against dates
 **Spreadsheet import** (list or whole event): choose a .xlsx or .csv, match the columns, match unknown voice spellings (remembered afterwards), review new districts and congregations, preview, then Import. Imported people are saved in People. Nothing is merged automatically; look-alikes appear in **People → Possible duplicates**.
 
 **Also new**: Congregations page (same spelling-matching as districts), optional Title, Events pages now show events first with lists, team and analytics inside each event, and a PDF analytics report for both attendance and tracker events.
+
+## Stage 2: offline, undo, history, follow-up, search
+**Setting up an existing system**: run `supabase/sql/15_stage2.sql` once in the Supabase SQL Editor (safe to run twice; a new project runs 01, 02, 03, 14, 15), then rebuild and push. No new packages. The app now has a manifest and a service worker, so it can be installed to a phone's home screen.
+
+- **Working offline.** Open a tracker list or the registrar page while online once; it is remembered on that device. With no connection, ticks and registrar marks are saved on the device, shown in a banner, and sent automatically when the connection returns (or with *Send now*). Each mark carries its own id, so sending twice never records twice. Offline marking works for lists already opened and, for registrars, people already found by search. Adding brand-new people needs a connection.
+- **Late marks.** A registrar mark made offline counts if it was made while the list was open (2 minutes of clock tolerance). One made before it opened or after it closed waits on the admin dashboard under *Late marks*, to approve or reject. Tracker ticks have no open window, so they always count and keep the time they were made.
+- **My recent actions** (clock button in the header, for admins, managers, list managers and registrars): the last 3 days of what you did, with Undo for 24 hours (ticks, registrations, marks). Undo of a mark keeps the record as removed, and every undo is in the audit log.
+- **Attendance history** per person: People → History (events and trackers).
+- **Absent follow-up**: on a tracker list, *Absent* shows who missed a date (or the last 3), with Call and WhatsApp links for people who can see phone numbers, copy and CSV download.
+- **Audit log** now searches by name, action or detail text, with a type filter and date range.
+- **Search anywhere**: Ctrl+K (Cmd+K on Mac) or the magnifier in the header.
