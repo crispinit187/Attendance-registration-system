@@ -1,5 +1,5 @@
 import { useLiveSync } from '../lib/live';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
@@ -74,6 +74,52 @@ const jump = (id: string) => {
   else document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
+/** The page area. A new page slides in a few pixels (from the right when going deeper, from the left when going back). */
+function AnimatedOutlet() {
+  const loc = useLocation();
+  const depth = loc.pathname.split('/').filter(Boolean).length;
+  const prev = useRef({ path: loc.pathname, depth, dir: 'fade' });
+  if (prev.current.path !== loc.pathname) {
+    prev.current = { path: loc.pathname, depth, dir: depth > prev.current.depth ? 'fwd' : depth < prev.current.depth ? 'back' : 'fade' };
+  }
+  return <div key={loc.pathname} className={`pageanim ${prev.current.dir}`}><Outlet /></div>;
+}
+
+/** Moves the highlight behind the active side-panel link, so changing section slides instead of jumping. */
+function useNavPill(ref: React.RefObject<HTMLElement | null>, deps: unknown[]) {
+  useLayoutEffect(() => {
+    const place = () => {
+      const nav = ref.current; if (!nav) return;
+      const a = nav.querySelector<HTMLElement>('a.active');
+      const pill = nav.querySelector<HTMLElement>('.navpill'); if (!pill) return;
+      if (!a) { pill.style.opacity = '0'; return; }
+      pill.style.opacity = '1'; pill.style.height = `${a.offsetHeight}px`; pill.style.transform = `translateY(${a.offsetTop}px)`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    void document.fonts?.ready.then(place);
+    return () => window.removeEventListener('resize', place);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
+/** Top bar for the admin-style layout: search, recent actions, light/dark and sign out live here. */
+function TopBar() {
+  const [raised, setRaised] = useState(false);
+  useEffect(() => {
+    const on = () => setRaised(window.scrollY > 4);
+    on(); window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
+  return (
+    <header className={`topbar ${raised ? 'raised' : ''}`}>
+      <span className="mobile-only"><BrandLabel size={32} short /></span>
+      <div className="grow" />
+      <HeaderActions />
+    </header>
+  );
+}
+
 export function Shell() {
   const { account, session } = useAuth();
   const qc = useQueryClient();
@@ -84,6 +130,8 @@ export function Shell() {
   const loc = useLocation();
   const nav = useNavigate();
   const onRegistrar = loc.pathname === '/registrar';
+  const sideRef = useRef<HTMLElement>(null);
+  useNavPill(sideRef, [loc.pathname, active, role]);
   const name = account?.full_name || account?.email || '';
   const done = useCallback(() => { void qc.invalidateQueries(); }, [qc]);
 
@@ -91,7 +139,7 @@ export function Shell() {
   if (role === 'member') {
     return (
       <div className="shell">
-        <Outlet />
+        <AnimatedOutlet />
         <OfflineBar onDone={done} />{role !== 'member' && <SearchHost pages={pagesFor(role)} />}
         <nav className="bottomnav" aria-label="Main">
           {MEMBER.map((i) => (
@@ -104,7 +152,7 @@ export function Shell() {
   if (role === 'registrar') {
     return (
       <div className="shell">
-        <Outlet />
+        <AnimatedOutlet />
         <OfflineBar onDone={done} /><SearchHost pages={pagesFor(role)} />
         <nav className="bottomnav" aria-label="Main">
           {REGISTRAR.map((i) => (
@@ -124,21 +172,17 @@ export function Shell() {
   const items = isAdmin ? ADMIN : role === 'manager' ? MANAGER : role === 'list_manager' ? LISTMGR : role === 'reviewer' && onTrackers ? [{ to: '/review', label: 'Attendance', icon: 'chart' }, { to: '/trackers', label: 'Trackers', icon: 'list' }] : null;
   return (
     <div className="shell admin">
-      <nav className="sidenav" aria-label="Sections">
+      <nav className="sidenav" aria-label="Sections" ref={sideRef}>
+        <span className="navpill" aria-hidden="true" />
         <div className="brand" style={{ padding: '0 8px 18px', margin: 0, fontSize: 12 }}><svg width="36" height="36" viewBox="0 0 44 44" aria-hidden="true"><rect x="2" y="2" width="40" height="40" rx="12" fill="var(--accent)" /><path d="M13 23l6 6 12-13" fill="none" stroke="var(--accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg><div>Attendance<br />Registration</div></div>
         {items
           ? items.map((i) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}>{i.label}</NavLink>)
           : <>{REVIEWER.map((i) => <a key={i.id} href="#" className={(active || 'rv-top') === i.id ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActive(i.id); jump(i.id); }}>{i.label}</a>)}<NavLink to="/trackers" className={({ isActive }) => (isActive ? 'active' : '')}>Trackers</NavLink></>}
-        <div className="signed">Signed in as<br /><b>{name}</b>
-          <div style={{ marginTop: 10 }}><HeaderActions /></div></div>
+        <div className="signed">Signed in as<br /><b>{name}</b></div>
       </nav>
       <div className="main" style={{ flex: 1, minWidth: 0 }}>
-        <header className="topbar mobile-only">
-          <BrandLabel size={32} short />
-          <div className="grow" />
-          <HeaderActions />
-        </header>
-        <Outlet />
+        <TopBar />
+        <AnimatedOutlet />
       </div>
       <OfflineBar onDone={done} /><SearchHost pages={pagesFor(role)} />
       {items && (

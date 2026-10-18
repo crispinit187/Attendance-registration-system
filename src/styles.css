@@ -107,8 +107,8 @@ svg.logosvg { flex: none; display: block; }
   .mobile-only { display: none !important; }
   .shell.admin { flex-direction: row; }
   .shell.admin .sidenav { display: flex; flex-direction: column; gap: 4px; width: 260px; padding: 28px 16px; border-right: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; height: 100dvh; overflow-y: auto; }
-  .shell.admin .sidenav a { padding: 11px 12px; border-radius: 10px; text-decoration: none; color: var(--text); font-weight: 500; display: block; }
-  .shell.admin .sidenav a.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .shell.admin .sidenav a { position: relative; z-index: 1; padding: 11px 12px; border-radius: 10px; text-decoration: none; color: var(--text); font-weight: 500; display: block; }
+  .shell.admin .sidenav a.active { background: transparent; color: var(--accent-ink); font-weight: 600; }
   .shell.admin .sidenav a { font-size: 15px; }
   .shell.admin .sidenav a:not(.active):hover { background: var(--accent-soft); }
   .shell.admin .main { flex: 1; min-width: 0; }
@@ -357,3 +357,64 @@ table.tgrid { border-collapse: separate; border-spacing: 0; font-size: .92rem; m
 .offrow.off { border-color: var(--danger); --tint: var(--danger-soft); }
 .offrow.sync { border-color: var(--accent); --tint: var(--accent-soft); }
 .offrow.warn { border-color: var(--warn); --tint: var(--warn-soft); }
+
+/* ---------- Motion ---------- */
+:root { --ease: cubic-bezier(.22,.8,.3,1); }
+@keyframes pageFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pageFwd { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes pageBack { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.pageanim { animation: pageFade .22s var(--ease) backwards; }
+.pageanim.fwd { animation-name: pageFwd; animation-duration: .26s; }
+.pageanim.back { animation-name: pageBack; animation-duration: .26s; }
+.pageanim .stack > :is(.card,.rowcard,.item,section) { animation: rise .3s var(--ease) backwards; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(1) { animation-delay: 35ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(2) { animation-delay: 70ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(3) { animation-delay: 105ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(4) { animation-delay: 140ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(5) { animation-delay: 175ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(6) { animation-delay: 210ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(7) { animation-delay: 245ms; }
+.pageanim .stack > :is(.card,.rowcard,.item,section):nth-child(8) { animation-delay: 280ms; }
+
+.overlay { animation: fadeIn .18s ease-out; }
+.modal { animation: popIn .22s var(--ease); }
+.toast { animation: toastIn .22s var(--ease); }
+.offrow { animation: slideUp .25s var(--ease); }
+
+/* side panel highlight that slides between options */
+.navpill { display: none; }
+@media (min-width: 900px) {
+  .shell.admin .navpill { display: block; position: absolute; left: 16px; right: 16px; top: 0; height: 0; border-radius: 10px; background: var(--accent); opacity: 0; pointer-events: none; z-index: 0; transition: transform .32s var(--ease), height .32s var(--ease), opacity .2s; }
+  .shell.admin .sidenav a { transition: color .2s, background-color .15s; }
+  .shell.admin .sidenav .brand, .shell.admin .sidenav .signed { position: relative; z-index: 1; }
+}
+
+/* top bar */
+.topbar { transition: box-shadow .2s; }
+.topbar.raised { box-shadow: 0 6px 18px rgba(0,0,0,.14); }
+@media (min-width: 900px) { .shell.admin .topbar { padding: 10px 28px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom-color: transparent; } .shell.admin .topbar.raised { border-bottom-color: var(--border); } }
+
+/* soft hover and press */
+.btn, .iconbtn, .rowcard, .chip, .namebtn, .bottomnav a, .bottomnav button { transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .12s; }
+.btn:not(:disabled):active, .iconbtn:active { transform: scale(.97); }
+.tgrid .tick input { transition: transform .12s; }
+.tgrid .tick input:active { transform: scale(.85); }
+
+/* scrollbars appear while scrolling or hovering, then fade away */
+:root { --sb: rgba(128,138,150,.55); }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background-color: transparent; border: 3px solid transparent; background-clip: content-box; border-radius: 999px; transition: background-color .5s ease; }
+*:not(html):not(body):hover::-webkit-scrollbar-thumb, [data-scrolling]::-webkit-scrollbar-thumb { background-color: var(--sb); }
+::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+@supports (-moz-appearance: none) { * { scrollbar-width: thin; scrollbar-color: var(--sb) transparent; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
