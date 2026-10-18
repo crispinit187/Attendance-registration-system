@@ -36,7 +36,7 @@ function Palette({ pages, onClose }: { pages: Page[]; onClose: () => void }) {
   const role = account?.role ?? 'member';
   const nav = useNavigate();
   const isAdmin = role === 'admin';
-  const isStaff = isAdmin || role === 'manager';
+  const isStaff = isAdmin || role === 'manager' || role === 'list_manager';
   const base = isAdmin ? '/admin' : '/manage';
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);

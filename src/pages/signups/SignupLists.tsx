@@ -6,10 +6,11 @@ import { errMsg, fmtDateTime } from '../../lib/format';
 import type { SignupListRow } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Icon, Loading, useToast } from '../../components/ui';
 import { SignupForm } from './SignupForm';
-import { StaffTop, useCanManage } from './common';
+import { StaffTop, useCanEdit, useCanManage } from './common';
 
 export function SignupLists() {
   const isAdmin = useCanManage();
+  const canEdit = useCanEdit();
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
@@ -26,7 +27,7 @@ export function SignupLists() {
           <h1 style={{ margin: 0 }}>Sign-ups</h1>
           <div className="muted small">People sign up by scanning a QR code or opening a shared link. No account is needed.</div>
         </div>
-        {isAdmin && <button className="btn primary" onClick={() => setCreating(true)}><Icon name="plus" size={16} />New sign-up list</button>}
+        {canEdit && <button className="btn primary" onClick={() => setCreating(true)}><Icon name="plus" size={16} />New sign-up list</button>}
       </div>
       {lists.error && <Alert>{errMsg(lists.error)}</Alert>}
 

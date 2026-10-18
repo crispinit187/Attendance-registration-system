@@ -12,7 +12,7 @@ const ROLE_HELP: Record<string, string> = {
   registrar: 'Registers people at the venue, including people without phones or accounts.',
   reviewer: 'Sees reports and exports for the events or lists you give them.',
   manager: 'Runs the events and sign-up lists you give them: creates lists, opens and closes registration, marks attendance, sees contact numbers and exports. Cannot create events or use Accounts, Setup, Districts or the audit log.',
-  list_manager: 'Runs the tracker lists you give them: adds the date columns, imports spreadsheets, ticks people, adds and removes people from the list and sees phone numbers. Cannot create events or lists.',
+  list_manager: 'Runs the single lists you give them (tracker lists, one attendance list, or a sign-up list): opens and closes, shows the QR, marks and removes people, imports, sees phone numbers and exports. Cannot create or delete lists or events, give access or approve late marks.',
   admin: 'Full control.',
 };
 
@@ -187,12 +187,12 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
       <form className="stack" onSubmit={submit} noValidate>
         <Field label="Role" hint={ROLE_HELP[role]}>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="manager">Event manager</option><option value="list_manager">List manager (trackers)</option><option value="reviewer">Reviewer</option><option value="registrar">Registrar</option>
+            <option value="manager">Event manager</option><option value="list_manager">List manager</option><option value="reviewer">Reviewer</option><option value="registrar">Registrar</option>
             <option value="member">Member (for someone you already registered)</option><option value="admin">Admin</option>
           </select>
         </Field>
         {role === 'manager' && <Alert kind="info">An event manager works only with the events and sign-up lists you give them. After creating the account, choose them from the ⋯ menu on their row (Access and permissions), or from the event or sign-up list itself.</Alert>}
-        {role === 'list_manager' && <Alert kind="info">A list manager works only with the tracker lists you give them. After creating the account, choose their lists from the ⋯ menu on their row (Access and permissions), or from the tracker event itself.</Alert>}
+        {role === 'list_manager' && <Alert kind="info">A list manager works only with the tracker lists, single attendance lists and sign-up lists you give them. After creating the account, choose them from the ⋯ menu on their row (Access and permissions).</Alert>}
         {(role === 'reviewer' || role === 'registrar') && (
           <Field label="Access" hint={scope === 'selected' ? 'Choose their events and lists afterwards from the ⋯ menu on their row.' : 'Every event and list, including future ones.'}>
             <select className="input" value={scope} onChange={(e) => setScope(e.target.value as 'all' | 'selected')}>
@@ -255,8 +255,8 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
   const isRegistrar = account.role === 'registrar';
   const isListMgr = account.role === 'list_manager';   // trackers only, always limited to what is selected
   const isManager = account.role === 'manager' || isListMgr;   // always limited to what is selected
-  const hasSignups = (isRegistrar || account.role === 'manager');
-  const attendance = !isListMgr;   // list managers only work with trackers
+  const hasSignups = (isRegistrar || account.role === 'manager' || isListMgr);
+  const attendance = true;
   const mine = (grants.data ?? []).filter((g) => g.account_id === account.id);
   const name = (g: (typeof mine)[number]) => (g.event_id ? `Whole event: ${events.data?.find((e) => e.id === g.event_id)?.name}`
     : g.list_id ? `List: ${lists.data?.find((l) => l.id === g.list_id)?.title}`
@@ -294,11 +294,11 @@ function GrantDialog({ account, onClose, onChanged }: { account: Account; onClos
               <div className="item" key={g.id}><div className="grow">{name(g)}</div>
                 <button className="btn small danger" onClick={() => setRevoking(g.id)}>Remove</button></div>
             ))}
-            {attendance && <Field label="Give access to a whole event (all its lists, now and later)">
+            {attendance && !isListMgr && <Field label="Give access to a whole event (all its lists, now and later)">
               <div className="row"><select className="input grow" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Choose event…</option>{events.data?.filter((e) => !e.archived_at).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
                 <button className="btn" disabled={!ev} onClick={() => add(ev, null, null)}>Add</button></div>
             </Field>}
-            {attendance && !isManager && <Field label="Or to one list only">
+            {account.role !== 'manager' && <Field label={isListMgr ? 'Give access to one attendance list' : 'Or to one list only'}>
               <div className="row"><select className="input grow" value={li} onChange={(e) => setLi(e.target.value)}><option value="">Choose list…</option>{lists.data?.filter((l) => l.status !== 'archived').map((l) => <option key={l.id} value={l.id}>{events.data?.find((e) => e.id === l.event_id)?.name}: {l.title}</option>)}</select>
                 <button className="btn" disabled={!li} onClick={() => add(null, li, null)}>Add</button></div>
             </Field>}
@@ -340,16 +340,16 @@ function RoleDialog({ account, grants, onClose, onChanged }: { account: Account;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const name = account.full_name || account.email || 'This account';
-  const kept = (r: string) => grants.filter((g) => !(r === 'admin' || r === 'member' || (r === 'manager' && (g.list_id || g.tracker_list_id)) || (r === 'list_manager' && (g.event_id || g.list_id || g.signup_list_id)) || (r === 'reviewer' && g.signup_list_id)));
+  const kept = (r: string) => grants.filter((g) => !(r === 'admin' || r === 'member' || (r === 'manager' && (g.list_id || g.tracker_list_id)) || (r === 'list_manager' && g.event_id) || (r === 'reviewer' && g.signup_list_id)));
   const effect = (r: string) => {
     if (r === 'admin') return 'They get full control of the system. Any access they were given is cleared because admins do not need it.';
     if (r === 'member') return `They will only mark their own attendance by scanning. All access they were given is removed${grants.length ? ` (${grants.length} item${grants.length === 1 ? '' : 's'})` : ''}. If they have no personal details yet, they are asked for them next time they sign in.`;
     const lost = grants.length - kept(r).length;
     const base = r === 'manager' ? 'They work only with the events, sign-up lists and tracker events you give them.'
-      : r === 'list_manager' ? 'They work only with the tracker lists you give them.'
+      : r === 'list_manager' ? 'They work only with the tracker lists, single attendance lists and sign-up lists you give them.'
       : r === 'reviewer' ? 'They see reports and exports for what you give them.' : 'They register people at the venue.';
     const keep = kept(r).length ? ` ${kept(r).length} access item${kept(r).length === 1 ? ' is' : 's are'} kept.` : '';
-    const drop = lost ? ` ${lost} item${lost === 1 ? '' : 's'} the new role cannot use ${lost === 1 ? 'is' : 'are'} removed (${r === 'manager' ? 'single lists' : r === 'list_manager' ? 'attendance events, lists and sign-up lists' : 'sign-up lists'}).` : '';
+    const drop = lost ? ` ${lost} item${lost === 1 ? '' : 's'} the new role cannot use ${lost === 1 ? 'is' : 'are'} removed (${r === 'manager' ? 'single lists' : r === 'list_manager' ? 'whole attendance events' : 'sign-up lists'}).` : '';
     const scopeNote = r === 'manager' || r === 'list_manager' ? ' They always see only what you select.' : account.role === 'member' || account.role === 'admin' ? (r === 'reviewer' ? ' Reviewers start with only what you select, so choose their access next.' : ' Registrars start with access to everything; change that from Access and permissions if needed.') : '';
     return base + keep + drop + scopeNote;
   };

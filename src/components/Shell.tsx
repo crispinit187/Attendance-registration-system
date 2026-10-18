@@ -36,7 +36,11 @@ const MANAGER: Item[] = [
   { to: '/signups', label: 'Sign-ups', icon: 'link' },
   { to: '/manage/exports', label: 'Exports', icon: 'down' },
 ];
-const LISTMGR: Item[] = [{ to: '/trackers', label: 'Trackers', icon: 'list' }];
+const LISTMGR: Item[] = [
+  { to: '/manage/lists', label: 'Attendance', icon: 'cal' },
+  { to: '/trackers', label: 'Trackers', icon: 'list' },
+  { to: '/signups', label: 'Sign-ups', icon: 'link' },
+];
 const REVIEWER = [
   { id: 'rv-top', label: 'Overview', icon: 'home' },
   { id: 'rv-access', label: 'Lists', icon: 'list' },

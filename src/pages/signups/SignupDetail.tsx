@@ -7,7 +7,7 @@ import { errMsg, fmtDateTime, initials } from '../../lib/format';
 import type { PersonCard, ProfileInput, SignupDetailInfo, SignupEntry, SignupMatch } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 import { PersonForm } from '../../components/PersonForm';
-import { StaffTop, useCanManage, useIsAdmin } from './common';
+import { StaffTop, useCanEdit, useCanManage, useIsAdmin } from './common';
 import { TeamPanel } from '../../components/TeamPanel';
 import { PasteTab } from './PasteTab';
 import { QrTab } from './QrTab';
@@ -18,6 +18,7 @@ export function SignupDetail() {
   const { id = '' } = useParams();
   const isAdmin = useCanManage();   // admins and event managers
   const reallyAdmin = useIsAdmin();
+  const canEdit = useCanEdit();
   const qc = useQueryClient();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('entries');
@@ -44,7 +45,7 @@ export function SignupDetail() {
         <div style={{ textAlign: 'right' }}><div className="count">{list.entries}</div><div className="muted small">signed up</div></div>
       </div>
 
-      {isAdmin && <TeamPanel kind="signup" targetId={list.id} canEdit={reallyAdmin} />}
+      {canEdit && <TeamPanel kind="signup" targetId={list.id} canEdit={reallyAdmin} />}
 
       <div className={`statusbar ${open ? 'open' : ''}`}>
         <div className="row" style={{ gap: 10 }}>
@@ -59,12 +60,12 @@ export function SignupDetail() {
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'entries'} className={tab === 'entries' ? 'on' : ''} onClick={() => setTab('entries')}>Entries</button>
         <button role="tab" aria-selected={tab === 'paste'} className={tab === 'paste' ? 'on' : ''} onClick={() => setTab('paste')}>Paste a list</button>
-        <button role="tab" aria-selected={tab === 'qr'} className={tab === 'qr' ? 'on' : ''} onClick={() => setTab('qr')}>{isAdmin ? 'QR and settings' : 'QR and link'}</button>
+        <button role="tab" aria-selected={tab === 'qr'} className={tab === 'qr' ? 'on' : ''} onClick={() => setTab('qr')}>{canEdit ? 'QR and settings' : 'QR and link'}</button>
       </div>
 
       {tab === 'entries' && <EntriesTab list={list} isAdmin={isAdmin} reallyAdmin={reallyAdmin} />}
       {tab === 'paste' && <PasteTab list={list} />}
-      {tab === 'qr' && <QrTab list={list} isAdmin={isAdmin} />}
+      {tab === 'qr' && <QrTab list={list} isAdmin={canEdit} />}
 
       {act !== null && (
         <ConfirmDialog title={act ? `Open sign-ups for “${list.title}”?` : `Close sign-ups for “${list.title}”?`}

@@ -18,4 +18,6 @@ export function StaffTop() {
 /** Admins only (turning entries into people, deleting entries for good). */
 export const useIsAdmin = () => useAuth().account?.role === 'admin';
 /** Admins and event managers: settings, open and close, contact numbers, restore and export. */
-export const useCanManage = () => ['admin', 'manager'].includes(useAuth().account?.role ?? '');
+export const useCanManage = () => ['admin', 'manager', 'list_manager'].includes(useAuth().account?.role ?? '');
+/** Admins and event managers only: create, edit and delete lists, make new links, see who has access. */
+export const useCanEdit = () => ['admin', 'manager'].includes(useAuth().account?.role ?? '');

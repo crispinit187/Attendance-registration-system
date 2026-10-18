@@ -19,6 +19,7 @@ export function EventDetail() {
   const nav = useNavigate();
   const base = useBase();
   const isAdmin = useAuth().account?.role === 'admin';
+  const canEdit = ['admin', 'manager'].includes(useAuth().account?.role ?? '');
   const [sp, setSp] = useSearchParams();
   const events = useQuery({ queryKey: ['events'], queryFn: api.events, refetchInterval: 30_000 });
   const lists = useQuery({ queryKey: ['lists'], queryFn: api.lists, refetchInterval: 30_000 });
@@ -44,7 +45,7 @@ export function EventDetail() {
           <h1 style={{ margin: 0 }}>{ev.name} {ev.archived_at && <Badge kind="warn">archived</Badge>}</h1>
           <div className="row">
             {isAdmin && <button className="btn small ghost" onClick={() => setRename(true)}>Rename</button>}
-            {!ev.archived_at && <button className="btn small primary" onClick={() => setForm({ list: null })}><Icon name="plus" size={14} />Add list</button>}
+            {canEdit && !ev.archived_at && <button className="btn small primary" onClick={() => setForm({ list: null })}><Icon name="plus" size={14} />Add list</button>}
             {isAdmin && !ev.archived_at && <button className="btn small" onClick={() => setEvAct('archive')}>Archive</button>}
             {isAdmin && ev.archived_at && (
               <>
@@ -55,7 +56,7 @@ export function EventDetail() {
           </div>
         </div>
       </div>
-      <TeamPanel kind="event" targetId={ev.id} canEdit={isAdmin} />
+      {canEdit && <TeamPanel kind="event" targetId={ev.id} canEdit={isAdmin} />}
 
       <div className="row between">
         <h2 style={{ margin: 0 }}>Lists</h2>
@@ -77,9 +78,9 @@ export function EventDetail() {
             <div className="row">
               {(l.status === 'draft' || l.status === 'closed') && <button className="btn small primary" onClick={() => setAct({ kind: 'open', list: l })}>{l.status === 'closed' ? 'Re-open' : 'Open'}</button>}
               {l.status === 'open' && <button className="btn small danger" onClick={() => setAct({ kind: 'close', list: l })}>Close</button>}
-              {l.status !== 'archived' && <button className="btn small" onClick={() => setForm({ list: l })}>Edit</button>}
-              {(l.status === 'closed' || l.status === 'draft') && <button className="btn small" onClick={() => setAct({ kind: 'archive', list: l })}>Archive</button>}
-              {l.status === 'archived' && (
+              {canEdit && l.status !== 'archived' && <button className="btn small" onClick={() => setForm({ list: l })}>Edit</button>}
+              {canEdit && (l.status === 'closed' || l.status === 'draft') && <button className="btn small" onClick={() => setAct({ kind: 'archive', list: l })}>Archive</button>}
+              {canEdit && l.status === 'archived' && (
                 <>
                   <button className="btn small" onClick={async () => { try { await api.unarchiveList(l.id); toast('Restored from archive.'); reload(); } catch (e) { toast(errMsg(e)); } }}>Restore</button>
                   <button className="btn small danger" onClick={() => setAct({ kind: 'delete', list: l })}>Delete…</button>

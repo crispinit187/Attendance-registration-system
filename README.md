@@ -136,3 +136,7 @@ A separate **Trackers** section for events where people are ticked against dates
 - **Absent follow-up**: on a tracker list, *Absent* shows who missed a date (or the last 3), with Call and WhatsApp links for people who can see phone numbers, copy and CSV download.
 - **Audit log** now searches by name, action or detail text, with a type filter and date range.
 - **Search anywhere**: Ctrl+K (Cmd+K on Mac) or the magnifier in the header.
+
+## List managers (single lists)
+
+Run `supabase/sql/16_list_manager.sql` after `15_stage2.sql`. A list manager can now be given tracker lists, **one attendance list** (not a whole event) and sign-up lists, from Accounts → Access and permissions. On those lists they can open and close, show the QR and venue screen, mark people, remove and restore attendees, see phone numbers, export, and for sign-ups paste/review entries and turn them into people. They cannot create, edit or delete lists or events, give access, or approve late marks (admin only). Event managers can now also turn sign-up entries into people.

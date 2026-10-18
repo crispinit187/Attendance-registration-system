@@ -94,5 +94,5 @@ export function useLookups() {
 /** Where the shared admin pages live for this person: admins use /admin, event managers /manage. */
 export function useBase() {
   const r = useAuth().account?.role;
-  return r === 'manager' ? '/manage' : '/admin';
+  return r === 'manager' || r === 'list_manager' ? '/manage' : '/admin';
 }
