@@ -40,10 +40,9 @@ export function Accounts() {
   const grants = useQuery({ queryKey: ['grants'], queryFn: api.grants });
   const [inviting, setInviting] = useState(false);
   const [filter, setFilter] = useState('');
-  const [tab, setTab] = useState<'active' | 'disabled'>('active');
+  const [tab, setTab] = useState<'active' | 'pending' | 'disabled'>('active');
   const [removing, setRemoving] = useState<Account | null>(null);
   const [verifying, setVerifying] = useState<Account | null>(null);
-  const [state, setState] = useState<'all' | AccountState>('all');
   const statuses = useQuery({ queryKey: ['account-statuses'], queryFn: api.accountStatuses, refetchInterval: 10_000 });
   const stMap = useMemo(() => new Map((statuses.data ?? []).map((s) => [s.id, s])), [statuses.data]);
   const [linking, setLinking] = useState<Account | null>(null);
@@ -61,10 +60,9 @@ export function Accounts() {
 
   if (accounts.isLoading) return <div className="page wide"><Loading /></div>;
   const all = accounts.data ?? [];
-  const disabledCount = all.filter((a) => a.disabled).length;
-  const pendingCount = all.filter((a) => stateOf(a, stMap.get(a.id)) === 'pending').length;
-  const rows = all.filter((a) => (tab === 'disabled') === a.disabled)
-    .filter((a) => state === 'all' || tab === 'disabled' || stateOf(a, stMap.get(a.id)) === state)
+  const kind = (a: Account): 'active' | 'pending' | 'disabled' => (a.disabled ? 'disabled' : stateOf(a, stMap.get(a.id)) === 'pending' ? 'pending' : 'active');
+  const count = { active: all.filter((a) => kind(a) === 'active').length, pending: all.filter((a) => kind(a) === 'pending').length, disabled: all.filter((a) => kind(a) === 'disabled').length };
+  const rows = all.filter((a) => kind(a) === tab)
     .filter((a) => !filter || `${a.email} ${a.full_name} ${a.role}`.toLowerCase().includes(filter.toLowerCase()));
   return (
     <div className="page wide stack">
@@ -74,16 +72,11 @@ export function Accounts() {
       </div>
       {accounts.error && <Alert>{errMsg(accounts.error)}</Alert>}
       <div className="tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-        <button role="tab" type="button" aria-selected={tab === 'active'} className={tab === 'active' ? 'on' : ''} onClick={() => setTab('active')}>Active and pending ({all.length - disabledCount})</button>
-        <button role="tab" type="button" aria-selected={tab === 'disabled'} className={tab === 'disabled' ? 'on' : ''} onClick={() => setTab('disabled')}>Disabled ({disabledCount})</button>
+        {([['active', 'Active'], ['pending', 'Pending'], ['disabled', 'Disabled']] as const).map(([k, l]) => (
+          <button key={k} role="tab" type="button" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l} ({count[k]})</button>
+        ))}
       </div>
-      {tab === 'active' && (
-        <div className="row" style={{ gap: 6 }}>
-          {([['all', 'All'], ['pending', `Pending verification${pendingCount ? ` (${pendingCount})` : ''}`], ['setup', 'No details yet'], ['active', 'Active']] as const).map(([k, l]) => (
-            <button key={k} type="button" className={`btn small ${state === k ? 'primary' : ''}`} onClick={() => setState(k)}>{l}</button>
-          ))}
-        </div>
-      )}
+      {tab === 'pending' && <div className="muted small">These people were invited but have not verified their email yet. Use the ⋯ menu to resend the invitation, verify by hand, or delete the account.</div>}
       {tab === 'disabled' && <div className="muted small">Disabled people cannot sign in. Enable an account to bring it back, or delete it for good. Their attendance history stays either way.</div>}
       <input className="input" placeholder="Search accounts…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="table-wrap">
@@ -134,7 +127,7 @@ export function Accounts() {
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>{tab === 'disabled' ? 'No disabled accounts.' : 'No accounts match.'}</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>{filter ? 'No accounts match.' : tab === 'disabled' ? 'No disabled accounts.' : tab === 'pending' ? 'Nobody is waiting to verify.' : 'No active accounts yet.'}</td></tr>}
           </tbody>
         </table>
       </div>
