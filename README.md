@@ -144,3 +144,7 @@ Run `supabase/sql/16_list_manager.sql` after `15_stage2.sql`. A list manager can
 ## Open and close dates (tracker)
 
 Run `supabase/sql/17_open_close_dates.sql` after `16_list_manager.sql`. Every tracker date column is **closed** until an admin, event manager or list manager opens it (tap "Closed" under the date). Only open columns can be ticked or unticked, so nobody can back-date a tick. Several columns can be open at once. An admin can still tick a closed column; it is shown as an override and logged. A tick made offline while a column was open is accepted when it syncs later (judged by the time it was made); one made while closed is refused and listed as held. Importing into a closed column stays allowed for admins, event managers and list managers. Existing columns become closed when you run the SQL.
+
+## Dates that have not started
+
+Run `supabase/sql/18_started_dates.sql` after `17_open_close_dates.sql`. A tracker date counts in attendance figures (percentages, "attended every date", the trend, the absent follow-up, a person's history, the "N dates" counts) only once it has been **opened at least once** or already has ticks. A future date you only added, and never opened, is left out. It shows "Not opened" under its heading. Columns that existed before open/close keep counting because they have ticks.

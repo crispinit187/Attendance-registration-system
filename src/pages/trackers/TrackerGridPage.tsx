@@ -66,6 +66,7 @@ export function TrackerGridPage() {
   const perms = g?.perms ?? { mark: false, manage: false, contact: false };
   const dates = useMemo(() => (g?.dates ?? []).filter((d) => showRemoved || !d.removed), [g, showRemoved]);
   const liveDates = useMemo(() => (g?.dates ?? []).filter((d) => !d.removed), [g]);
+  const startedCount = liveDates.filter((d) => d.started !== false).length;   // dates that count in attendance
   const tickable = useMemo(() => liveDates.filter((d) => d.open || perms.override), [liveDates, perms.override]);   // columns this person may tick right now
   const latest = tickable.length ? tickable[tickable.length - 1]!.id : null;
   const chosen = pick ?? new Set(latest ? [latest] : []);
@@ -141,7 +142,7 @@ export function TrackerGridPage() {
           </div>
         </div>
         <p className="muted small" style={{ margin: 0 }}>
-          {active.length} {active.length === 1 ? 'person' : 'people'} · {liveDates.length} {liveDates.length === 1 ? 'date' : 'dates'}
+          {active.length} {active.length === 1 ? 'person' : 'people'} · {startedCount} {startedCount === 1 ? 'date' : 'dates'}{startedCount < liveDates.length ? ` (+${liveDates.length - startedCount} not opened yet)` : ''}
           {!perms.mark && ' · view only'}
         </p>
       </div>
@@ -191,8 +192,8 @@ export function TrackerGridPage() {
                     ? <button className="namebtn" style={{ color: 'var(--muted)', fontSize: 'inherit', fontWeight: 600, textAlign: 'center' }} onClick={() => setDateDlg(d)}>{fmtShort(d.on_date)}{d.title ? <><br /><span style={{ fontWeight: 400 }}>{d.title.length > 12 ? d.title.slice(0, 11) + '…' : d.title}</span></> : null}</button>
                     : <>{fmtShort(d.on_date)}{d.title ? <><br /><span style={{ fontWeight: 400 }}>{d.title.length > 12 ? d.title.slice(0, 11) + '…' : d.title}</span></> : null}</>}
                   {!d.removed && (perms.manage
-                    ? <button type="button" className={`dstate ${d.open ? 'on' : ''}`} onClick={() => void setOpen(d, !d.open)} title={d.open ? 'Close this date so nobody can tick it' : 'Open this date so people can be ticked'}>{d.open ? 'Open' : 'Closed'}</button>
-                    : <span className={`dstate static ${d.open ? 'on' : ''}`}>{d.open ? 'Open' : 'Closed'}</span>)}
+                    ? <button type="button" className={`dstate ${d.open ? 'on' : ''}`} onClick={() => void setOpen(d, !d.open)} title={d.open ? 'Close this date so nobody can tick it' : 'Open this date so people can be ticked'}>{d.open ? 'Open' : d.started === false ? 'Not opened' : 'Closed'}</button>
+                    : <span className={`dstate static ${d.open ? 'on' : ''}`}>{d.open ? 'Open' : d.started === false ? 'Not opened' : 'Closed'}</span>)}
                 </th>
               ))}
               <th className="dcol">Total</th>

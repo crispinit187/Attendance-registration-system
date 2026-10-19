@@ -10,7 +10,7 @@ const shown = (r: { title: string | null; title_specify: string | null; name: st
 /** Who missed a date, with one-tap call and WhatsApp links. Built from the grid already on screen. */
 export function FollowUpDialog({ grid, onClose }: { grid: TrackerGrid; onClose: () => void }) {
   const toast = useToast();
-  const dates = grid.dates.filter((d) => !d.removed);
+  const dates = grid.dates.filter((d) => !d.removed && d.started !== false);   // a date that has not started cannot be missed
   const [mode, setMode] = useState<string>(dates.length ? dates[dates.length - 1]!.id : 'streak');
   const [note, setNote] = useState('');
   const canSee = grid.perms.contact;

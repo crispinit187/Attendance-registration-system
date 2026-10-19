@@ -112,7 +112,7 @@ export interface TrackerListSummary {
 export interface TrackerEvent {
   id: string; name: string; archived_at: string | null; created_at: string; can_edit: boolean; lists: TrackerListSummary[];
 }
-export interface TrackerDate { id: string; on_date: string; title: string | null; removed: boolean; open: boolean }
+export interface TrackerDate { id: string; on_date: string; title: string | null; removed: boolean; open: boolean; started?: boolean }
 export interface TrackerRow {
   entry_id: string; person_id: string; name: string; title_id: string | null; title: string | null; title_specify: string | null;
   contact: string | null; voice: string | null; area: string | null; district: string | null; congregation: string | null;
