@@ -428,3 +428,10 @@ table.tgrid { border-collapse: separate; border-spacing: 0; font-size: .92rem; m
 
 .backbtn { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-weight: 600; gap: 6px; text-decoration: none; }
 .backbtn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* Open / closed state of a tracker date column */
+.dstate { display: block; margin: 4px auto 0; font: inherit; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px;
+  border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s; }
+.dstate.on { background: color-mix(in srgb, var(--ok, #2f9e6f) 16%, transparent); color: var(--ok, #2f9e6f); border-color: color-mix(in srgb, var(--ok, #2f9e6f) 45%, transparent); }
+.dstate:hover:not(.static) { border-color: var(--accent, currentColor); }
+.dstate.static { cursor: default; }

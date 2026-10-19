@@ -140,3 +140,7 @@ A separate **Trackers** section for events where people are ticked against dates
 ## List managers (single lists)
 
 Run `supabase/sql/16_list_manager.sql` after `15_stage2.sql`. A list manager can now be given tracker lists, **one attendance list** (not a whole event) and sign-up lists, from Accounts → Access and permissions. On those lists they can open and close, show the QR and venue screen, mark people, remove and restore attendees, see phone numbers, export, and for sign-ups paste/review entries and turn them into people. They cannot create, edit or delete lists or events, give access, or approve late marks (admin only). Event managers can now also turn sign-up entries into people.
+
+## Open and close dates (tracker)
+
+Run `supabase/sql/17_open_close_dates.sql` after `16_list_manager.sql`. Every tracker date column is **closed** until an admin, event manager or list manager opens it (tap "Closed" under the date). Only open columns can be ticked or unticked, so nobody can back-date a tick. Several columns can be open at once. An admin can still tick a closed column; it is shown as an override and logged. A tick made offline while a column was open is accepted when it syncs later (judged by the time it was made); one made while closed is refused and listed as held. Importing into a closed column stays allowed for admins, event managers and list managers. Existing columns become closed when you run the SQL.

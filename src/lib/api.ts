@@ -186,6 +186,7 @@ export const api = {
     rpc<{ added: number }>('tracker_add_date', { p_list: list, p_date: date, p_title: title || null, p_all: all }),
   trackerUpdateDate: (id: string, date: string, title: string) => rpc('tracker_update_date', { p_date: id, p_on: date, p_title: title || null }),
   trackerRemoveDate: (id: string) => rpc('tracker_remove_date', { p_date: id }),
+  trackerSetDateOpen: (id: string, open: boolean) => rpc<{ open: boolean }>('tracker_set_date_open', { p_date: id, p_open: open }),
   trackerRestoreDate: (id: string) => rpc('tracker_restore_date', { p_date: id }),
   trackerMark: (entry: string, date: string, on: boolean) => rpc('tracker_set_mark', { p_entry: entry, p_date: date, p_on: on, p_at: null }),
   trackerSearch: (list: string, q: string) => rpc<TrackerCard[]>('tracker_search_people', { p_list: list, p_q: q }),

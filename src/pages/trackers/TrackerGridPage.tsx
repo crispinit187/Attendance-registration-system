@@ -66,7 +66,8 @@ export function TrackerGridPage() {
   const perms = g?.perms ?? { mark: false, manage: false, contact: false };
   const dates = useMemo(() => (g?.dates ?? []).filter((d) => showRemoved || !d.removed), [g, showRemoved]);
   const liveDates = useMemo(() => (g?.dates ?? []).filter((d) => !d.removed), [g]);
-  const latest = liveDates.length ? liveDates[liveDates.length - 1]!.id : null;
+  const tickable = useMemo(() => liveDates.filter((d) => d.open || perms.override), [liveDates, perms.override]);   // columns this person may tick right now
+  const latest = tickable.length ? tickable[tickable.length - 1]!.id : null;
   const chosen = pick ?? new Set(latest ? [latest] : []);
 
   const search2 = useQuery({
@@ -83,6 +84,7 @@ export function TrackerGridPage() {
 
   const toggle = async (row: TrackerRow, date: TrackerDate, on: boolean) => {
     const k = `${row.entry_id}|${date.id}`;
+    if (!date.open && perms.override) toast('Registration is closed for this date. Your tick is saved as an admin override and is logged.');
     pending.current.set(k, on);
     qc.setQueryData<TrackerGrid>(gridKey(listId), (old) => (old ? patch(old, row.entry_id, date.id, on) : old));
     const hold = () => {
@@ -103,6 +105,10 @@ export function TrackerGridPage() {
     if (pending.current.get(k) === on) pending.current.delete(k);
   };
 
+  const setOpen = async (d: TrackerDate, open: boolean) => {
+    try { await api.trackerSetDateOpen(d.id, open); toast(open ? `${fmtD(d.on_date)} is open. People can be ticked.` : `${fmtD(d.on_date)} is closed.`); reload(); }
+    catch (e) { toast(errMsg(e)); }
+  };
   const reload = () => { void qc.invalidateQueries({ queryKey: gridKey(listId) }); void qc.invalidateQueries({ queryKey: ['tracker-event', eventId] }); void qc.invalidateQueries({ queryKey: ['tracker-overview'] }); void qc.invalidateQueries({ queryKey: ['tracker-analytics'] }); };
 
   const addExisting = async (c: TrackerCard) => {
@@ -154,7 +160,7 @@ export function TrackerGridPage() {
             {liveDates.length > 0 && (
               <div className="stack" style={{ gap: 6 }}>
                 <span className="small muted">Tick a new person for:</span>
-                <DateChips dates={liveDates} value={chosen} onChange={setPick} />
+                <DateChips dates={tickable} value={chosen} onChange={setPick} />
               </div>
             )}
             {results.map((c) => (
@@ -184,6 +190,9 @@ export function TrackerGridPage() {
                   {perms.manage
                     ? <button className="namebtn" style={{ color: 'var(--muted)', fontSize: 'inherit', fontWeight: 600, textAlign: 'center' }} onClick={() => setDateDlg(d)}>{fmtShort(d.on_date)}{d.title ? <><br /><span style={{ fontWeight: 400 }}>{d.title.length > 12 ? d.title.slice(0, 11) + '…' : d.title}</span></> : null}</button>
                     : <>{fmtShort(d.on_date)}{d.title ? <><br /><span style={{ fontWeight: 400 }}>{d.title.length > 12 ? d.title.slice(0, 11) + '…' : d.title}</span></> : null}</>}
+                  {!d.removed && (perms.manage
+                    ? <button type="button" className={`dstate ${d.open ? 'on' : ''}`} onClick={() => void setOpen(d, !d.open)} title={d.open ? 'Close this date so nobody can tick it' : 'Open this date so people can be ticked'}>{d.open ? 'Open' : 'Closed'}</button>
+                    : <span className={`dstate static ${d.open ? 'on' : ''}`}>{d.open ? 'Open' : 'Closed'}</span>)}
                 </th>
               ))}
               <th className="dcol">Total</th>
@@ -203,7 +212,7 @@ export function TrackerGridPage() {
                   {dates.map((d) => (
                     <td key={d.id} className="dcol">
                       <label className="tick">
-                        <input type="checkbox" checked={r.marks.includes(d.id)} disabled={!perms.mark || r.removed || d.removed}
+                        <input type="checkbox" checked={r.marks.includes(d.id)} disabled={!perms.mark || r.removed || d.removed || !(d.open || perms.override)} title={!d.open && !d.removed ? (perms.override ? 'Registration is closed (admin override)' : 'Registration is closed') : undefined}
                           onChange={(e) => void toggle(r, d, e.target.checked)} aria-label={`${r.name} on ${fmtD(d.on_date)}`} />
                       </label>
                     </td>
@@ -227,6 +236,8 @@ export function TrackerGridPage() {
       </div>
       {!liveDates.length && perms.manage && <Alert kind="info">There are no dates yet. Use “Add date” to create the first column, then tick people as they arrive.</Alert>}
       {!liveDates.length && !perms.manage && <Alert kind="info">No dates have been added to this list yet. A list manager adds them.</Alert>}
+      {liveDates.length > 0 && perms.mark && !liveDates.some((d) => d.open) && <Alert kind="info">{perms.manage ? 'Every date is closed. Tap “Closed” under a date to open it when registration starts, then people can be ticked.' : 'Every date is closed, so ticking is switched off. A manager opens a date when registration starts.'}</Alert>}
+      {perms.override && liveDates.some((d) => !d.open) && <p className="hint" style={{ margin: 0 }}>As an admin you can still tick a closed date. It is shown as an override and logged.</p>}
 
       <TrackerAnalytics eventId={eventId} listId={listId} />
 
@@ -234,7 +245,7 @@ export function TrackerGridPage() {
       {dlg === 'import' && <ImportDialog eventId={eventId} listId={listId} eventName={g.list.event_name} dates={liveDates} onClose={() => setDlg(null)} onDone={reload} />}
       {dlg === 'followup' && <FollowUpDialog grid={g} onClose={() => setDlg(null)} />}
       {dlg === 'export' && <ExportDialog eventId={eventId} listId={listId} eventName={g.list.event_name} canContact={perms.contact} grid={g} onClose={() => setDlg(null)} />}
-      {dlg === 'create' && <CreateDialog listId={listId} name={typed} dates={liveDates} chosen={chosen} onClose={() => setDlg(null)}
+      {dlg === 'create' && <CreateDialog listId={listId} name={typed} dates={tickable} chosen={chosen} onClose={() => setDlg(null)}
         onDone={() => { setSearch(''); setDlg(null); reload(); }} />}
       {rowDlg && <RowDialog row={g.rows.find((r) => r.entry_id === rowDlg.entry_id) ?? rowDlg} perms={perms} onClose={() => setRowDlg(null)} onDone={reload} />}
       {dateDlg && <EditDateDialog d={g.dates.find((x) => x.id === dateDlg.id) ?? dateDlg} onClose={() => setDateDlg(null)} onDone={reload} />}
