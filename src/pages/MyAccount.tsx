@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { HeaderActions } from '../components/Shell';
+import { BackButton } from '../components/BackButton';
+import { homeFor } from '../lib/auth';
 import { Alert, Field, useToast } from '../components/ui';
 
 const msg = (e: unknown) => (e as { message?: string })?.message ?? 'Something went wrong. Try again.';
@@ -53,7 +54,8 @@ export function MyAccount() {
 
   return (
     <div className="page stack" style={{ paddingTop: 32 }}>
-      <div className="pageHead"><h1>My account</h1><HeaderActions /></div>
+      <BackButton to={homeFor(account?.role)}>Back</BackButton>
+      <div className="pageHead"><h1>My account</h1></div>
       <p className="muted small" style={{ margin: 0 }}>{ROLE[account?.role ?? ''] ?? account?.role} · signed in as {account?.email}</p>
 
       <div className="card stack">
