@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import { homeFor, useAuth } from '../../lib/auth';
 import { errMsg } from '../../lib/format';
 import { Alert, BrandLabel, Field } from '../../components/ui';
+import { PasswordInput } from '../../components/PasswordInput';
 
 export function SetPassword() {
   const { account, refresh } = useAuth();
@@ -39,8 +40,8 @@ export function SetPassword() {
         <form className="stack" onSubmit={submit} noValidate>
           <h1 className="auth-title" style={{ fontSize: 28 }}>{forced ? 'Choose your own password' : 'Set a new password'}</h1>
           {forced && <p className="muted">You signed in with a temporary password. Choose a new one to continue.</p>}
-          <Field label="New password" hint="At least 8 characters."><input className="input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
-          <Field label="Confirm new password"><input className="input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="New password" hint="At least 8 characters."><PasswordInput value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="Confirm new password"><PasswordInput value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
           {err && <Alert>{err}</Alert>}
           <button className="btn primary cta block" disabled={busy}>{busy ? 'Saving…' : 'Save password'}</button>
         </form>

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { errMsg } from '../../lib/format';
 import { Alert, Icon, Logo } from '../../components/ui';
 import { Turnstile, turnstileEnabled } from '../../components/Turnstile';
+import { PasswordInput } from '../../components/PasswordInput';
 
 type Mode = 'in' | 'up' | 'forgot';
 type Step = 'account' | 'verify';
@@ -190,12 +191,13 @@ export function Login() {
             </label>
             {mode !== 'forgot' && (
               <label className="field"><span>Password</span>
-                <input className="input" type="password" placeholder={mode === 'up' ? 'At least 8 characters' : 'Your password'} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} />
+                <PasswordInput placeholder={mode === 'up' ? 'At least 8 characters' : 'Your password'} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} />
               </label>
             )}
             {mode === 'up' && (
               <label className="field"><span>Confirm password</span>
-                <input className="input" type="password" placeholder="Repeat your password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
+                <PasswordInput placeholder="Repeat your password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
+              {pw2 && <span className={`hint ${pw === pw2 ? 'ok' : 'bad'}`} role="status">{pw === pw2 ? 'Passwords match' : 'Passwords do not match yet'}</span>}
               </label>
             )}
             <Turnstile onToken={setToken} resetKey={reset} />

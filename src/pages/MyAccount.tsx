@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { BackButton } from '../components/BackButton';
 import { homeFor } from '../lib/auth';
 import { Alert, Field, useToast } from '../components/ui';
+import { PasswordInput } from '../components/PasswordInput';
 
 const msg = (e: unknown) => (e as { message?: string })?.message ?? 'Something went wrong. Try again.';
 const ROLE: Record<string, string> = { admin: 'Administrator', manager: 'Event manager', list_manager: 'List manager', registrar: 'Registrar', reviewer: 'Reviewer', member: 'Member' };
@@ -68,9 +69,9 @@ export function MyAccount() {
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Change password</h2>
-        <Field label="Current password"><input className="input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
-        <Field label="New password" hint="At least 8 characters."><input className="input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
-        <Field label="New password again"><input className="input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
+        <Field label="New password" hint="At least 8 characters."><PasswordInput value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label="New password again"><PasswordInput value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
         {wErr && <Alert>{wErr}</Alert>}
         <button className="btn primary" disabled={wBusy} onClick={() => void savePassword()}>{wBusy ? 'Changing…' : 'Change password'}</button>
       </div>

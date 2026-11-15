@@ -480,3 +480,9 @@ table.tgrid { border-collapse: separate; border-spacing: 0; font-size: .92rem; m
 #root { transition: opacity .26s ease; }
 .signing-out #root { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .swap, .landing .auth-card, .landing .land-hero > * { animation: none !important; } .tabs::before { transition: none; } }
+
+.pwbox { position: relative; display: block; }
+.pwbox .input { width: 100%; padding-right: 48px; box-sizing: border-box; }
+.pweye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); border-radius: 10px; cursor: pointer; transition: color .15s, background-color .15s; }
+.pweye:hover, .pweye[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); }
+.hint.ok { color: var(--ok, #1e8e5a); } .hint.bad { color: var(--danger, #d64545); }
