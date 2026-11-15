@@ -11,6 +11,7 @@ import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } fr
 import { TeamPanel } from '../../components/TeamPanel';
 import { TrackerAnalytics } from '../../components/TrackerAnalytics';
 import { ImportDialog } from './ImportDialog';
+import { ExportDate } from '../../components/ExportDate';
 
 export function TrackerEventPage() {
   const { eventId = '' } = useParams();
@@ -146,21 +147,25 @@ function ListForm({ eventId, list, onClose, onDone }: { eventId: string; list: T
 
 function EventExport({ eventId, eventName, lists, canContact, onClose }: { eventId: string; eventName: string; lists: TrackerListSummary[]; canContact: boolean; onClose: () => void }) {
   const [contact, setContact] = useState(false);
+  const [date, setDate] = useState('');
+  const [absent, setAbsent] = useState(false);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
+  const days = useQuery({ queryKey: ['tracker-export-dates', eventId], queryFn: () => api.trackerAnalytics(eventId, null, null) });
   const run = async (kind: 'xlsx' | 'pdf' | 'report') => {
     setErr(''); setBusy(kind);
     try {
       const x = await import('../../lib/trackerExport');
-      await api.logExport('tracker_event', eventId, kind === 'report' ? 'pdf-report' : kind, { lists: lists.length, contact: contact && canContact });
-      if (kind === 'report') await x.trackerReportPdf(await api.trackerAnalytics(eventId, null, null));
-      else { const grids = await Promise.all(lists.map((l) => api.trackerGrid(l.id))); await x.exportTrackerGrid(eventName, grids, contact && canContact, kind); }
+      await api.logExport('tracker_event', eventId, kind === 'report' ? 'pdf-report' : kind, { lists: lists.length, contact: contact && canContact, date: date || 'all' });
+      if (kind === 'report') await x.trackerReportPdf(await api.trackerAnalytics(eventId, null, date || null));
+      else { const grids = await Promise.all(lists.map((l) => api.trackerGrid(l.id))); await x.exportTrackerGrid(eventName, grids, contact && canContact, kind, { date: date || null, includeAbsent: absent }); }
     } catch (e) { setErr(errMsg(e)); } finally { setBusy(''); }
   };
   return (
     <Modal title="Export the whole event" onClose={onClose}>
       <div className="stack">
         <p className="muted small" style={{ margin: 0 }}>Every list you can see, in one file. Each export is recorded in the audit log.</p>
+        <ExportDate dates={days.data?.dates ?? []} date={date} onDate={setDate} absent={absent} onAbsent={setAbsent} />
         {canContact && <label className="check"><input type="checkbox" checked={contact} onChange={(e) => setContact(e.target.checked)} />Include phone numbers</label>}
         <button className="btn block" disabled={!!busy} onClick={() => void run('xlsx')}>{busy === 'xlsx' ? 'Preparing…' : 'Excel: names and ticks'}</button>
         <button className="btn block" disabled={!!busy} onClick={() => void run('pdf')}>{busy === 'pdf' ? 'Preparing…' : 'PDF: names and ticks'}</button>

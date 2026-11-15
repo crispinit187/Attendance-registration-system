@@ -5,7 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { errMsg } from '../../lib/format';
 import { Alert, BrandLabel } from '../../components/ui';
 
-type OtpType = 'signup' | 'invite' | 'recovery' | 'email';
+type OtpType = 'signup' | 'invite' | 'recovery' | 'email' | 'email_change';
 
 /** Landing page for links in emails. The token is only used after a button click,
  *  so email scanners that open links in advance cannot use it up. */
@@ -22,7 +22,9 @@ export function Confirm() {
     ? { h: 'Reset your password', b: 'Continue to choose a new password.' }
     : type === 'invite'
       ? { h: 'Accept your invitation', b: 'Continue to set up your account.' }
-      : { h: 'Confirm your email', b: 'Tap the button to confirm your email address.' };
+      : type === 'email_change'
+        ? { h: 'Confirm your new email', b: 'Tap the button to confirm your new email address.' }
+        : { h: 'Confirm your email', b: 'Tap the button to confirm your email address.' };
 
   const go = async () => {
     if (!hash) return;

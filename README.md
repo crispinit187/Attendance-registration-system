@@ -148,3 +148,14 @@ Run `supabase/sql/17_open_close_dates.sql` after `16_list_manager.sql`. Every tr
 ## Dates that have not started
 
 Run `supabase/sql/18_started_dates.sql` after `17_open_close_dates.sql`. A tracker date counts in attendance figures (percentages, "attended every date", the trend, the absent follow-up, a person's history, the "N dates" counts) only once it has been **opened at least once** or already has ticks. A future date you only added, and never opened, is left out. It shows "Not opened" under its heading. Columns that existed before open/close keep counting because they have ticks.
+
+## Round 3 changes (run `19`, `20`, `21` in the SQL editor, in order, after `18`)
+- **Manage team** now lists people given only one list (shown as "only the list X"). (`19_tracker_team_lists.sql`)
+- **Adding people to a tracker list:** people already on the list show first inside the panel with tick toggles, "Add as new person" comes after, and the new-person form warns before creating a name that is already on the list.
+- **Typing dropdowns** for title, voice part, area, district and congregation: matches narrow as you type. District and congregation still accept a brand-new name. (`20_suggest_one_letter.sql` lets suggestions start from the first letter.)
+- **Exports for one date:** both export dialogs have a Date picker (default All dates). With one date the files and the analytics report cover that day only; "Also list the people who were absent" is optional.
+- **PDF exports** restyled (ink header bar, zebra rows, vector tick marks, footer with page numbers).
+- **My account** (`/account`, person icon in the top bar for staff and admins): edit name and phone, change password (current password required), change email (a confirmation link goes to the new address; the old one keeps working until it is confirmed). (`21_my_account.sql` adds the phone column and keeps `accounts.email` in step with Auth.)
+  - In Supabase, Authentication, Email templates, the **Change email address** template link must go to `{{ .SiteURL }}/#/auth/confirm?token_hash={{ .TokenHash }}&type=email_change`, like your other templates.
+  - Authentication, Providers, Email: "Secure email change" on means both old and new addresses must confirm. Built-in email is rate-limited, so use custom SMTP in production.
+- **Theme switch** blends with a circular reveal from the button (a plain fade on older browsers, none if the device asks for reduced motion).

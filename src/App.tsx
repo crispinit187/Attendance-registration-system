@@ -15,6 +15,7 @@ import { Dashboard } from './pages/member/Dashboard';
 import { Scan, ScanLanding } from './pages/member/Scan';
 import { History } from './pages/member/History';
 import { Profile } from './pages/member/Profile';
+import { MyAccount } from './pages/MyAccount';
 import { Registrar } from './pages/registrar/Registrar';
 import { VenueScreen } from './pages/venue/VenueScreen';
 import { SignupVenue } from './pages/signups/SignupVenue';
@@ -114,6 +115,9 @@ export default function App() {
           <Route path="/app/history" element={<History />} />
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/scan/:listId" element={<ScanLanding />} />
+        </Route>
+        <Route element={<Guard roles={['admin', 'manager', 'list_manager', 'registrar', 'reviewer']}><Shell /></Guard>}>
+          <Route path="/account" element={<MyAccount />} />
         </Route>
         <Route element={<Guard roles={['registrar']}><Shell /></Guard>}>
           <Route path="/registrar" element={<Registrar />} />

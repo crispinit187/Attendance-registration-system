@@ -20,7 +20,7 @@ export function TeamPanel({ kind, targetId, canEdit, lists }: { kind: Kind; targ
     refetchInterval: 30_000,
   });
   const team = q.data ?? [];
-  const names = (role: Role) => team.filter((t) => t.role === role).map((t) => t.name + (t.disabled ? ' (disabled)' : ''));
+  const names = (role: Role) => team.filter((t) => t.role === role).map((t) => t.name + (t.level === 'list' && t.list_title ? ` (${t.list_title})` : '') + (t.disabled ? ' (disabled)' : ''));
   const line = (label: string, list: string[], none: string) => (
     <div className="small"><span className="muted">{label}: </span>{list.length ? <b>{list.join(', ')}</b> : <span className="muted">{none}</span>}</div>
   );
@@ -51,7 +51,7 @@ function TeamDialog({ kind, targetId, team, lists, onClose }: { kind: Kind; targ
   // Reviewers do not work with sign-up lists; everyone else can be given an event or a sign-up list.
   const roles: Role[] = kind === 'event' ? ['manager', 'registrar', 'reviewer'] : kind === 'tracker' ? ['manager', 'list_manager', 'registrar', 'reviewer'] : ['manager', 'registrar'];
   const picked = (accounts.data ?? []).find((a) => a.id === pick);
-  const inTeam = new Set(team.map((t) => t.account_id));
+  const inTeam = new Set(team.filter((t) => t.level !== 'list').map((t) => t.account_id));   // someone with one list can still be given another
   const options = (accounts.data ?? []).filter((a: Account) => roles.includes(a.role) && !a.disabled && !inTeam.has(a.id))
     .sort((a, b) => (a.role === 'manager' ? -1 : 0) - (b.role === 'manager' ? -1 : 0) || (a.full_name ?? a.email ?? '').localeCompare(b.full_name ?? b.email ?? ''));
   const add = async () => {
@@ -69,7 +69,7 @@ function TeamDialog({ kind, targetId, team, lists, onClose }: { kind: Kind; targ
       <div className="stack">
         {team.length === 0 ? <Alert kind="info">Nobody has been given this {noun} yet.</Alert> : team.map((t) => (
           <div className="item" key={t.grant_id}>
-            <div className="grow"><b>{t.name}</b><div className="muted small">{LABEL[t.role]}{t.level === 'list' ? ' · one list' : ''}{t.email ? ` · ${t.email}` : ''}{t.disabled ? ' · disabled' : ''}</div></div>
+            <div className="grow"><b>{t.name}</b><div className="muted small">{LABEL[t.role]}{t.level === 'list' ? ` · only the list “${t.list_title ?? ''}”` : kind === 'tracker' ? ' · whole event' : ''}{t.email ? ` · ${t.email}` : ''}{t.disabled ? ' · disabled' : ''}</div></div>
             <button className="btn small danger" onClick={() => setRemoving(t)}>Remove</button>
           </div>
         ))}

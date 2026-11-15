@@ -13,6 +13,8 @@ import { TrackerAnalytics } from '../../components/TrackerAnalytics';
 import { ImportDialog } from './ImportDialog';
 import { FollowUpDialog } from '../../components/FollowUp';
 import { enqueue, flush, isNetworkError, newId, queued, queuedTicks, withCache } from '../../lib/offline';
+import { Combo } from '../../components/Combobox';
+import { ExportDate } from '../../components/ExportDate';
 
 const gridKey = (list: string) => ['tracker-grid', list];
 const shown = (r: { title: string | null; title_specify: string | null; name: string }) =>
@@ -127,6 +129,7 @@ export function TrackerGridPage() {
   const active = g.rows.filter((r) => !r.removed);
   const results = (search2.data ?? []).filter((c) => !c.in_list);
   const typed = search.trim();
+  const onList = typed.length >= 2 ? onListMatches(active, typed).slice(0, 4) : [];
 
   return (
     <div className="page wide stack">
@@ -158,9 +161,33 @@ export function TrackerGridPage() {
 
         {perms.mark && typed.length >= 2 && (
           <div className="card flat stack" style={{ gap: 10 }}>
+            {onList.length > 0 && (
+              <div className="stack" style={{ gap: 8 }}>
+                <span className="small" style={{ fontWeight: 700 }}>Already on this list. Do not add again:</span>
+                {onList.map((m) => (
+                  <div className="item" key={m.entry_id} style={{ flexWrap: 'wrap', gap: 8 }}>
+                    <div className="grow" style={{ minWidth: 160 }}>
+                      <b>{m.name}</b>
+                      <div className="muted small">{[m.voice, m.area, m.district, m.congregation].filter(Boolean).join(' · ') || 'No other details'}</div>
+                    </div>
+                    <div className="row" style={{ gap: 6 }}>
+                      {liveDates.map((d) => {
+                        const on = m.marks.includes(d.id);
+                        const can = perms.mark && (d.open || perms.override);
+                        return (
+                          <button key={d.id} type="button" className={`chip ${on ? 'on' : ''}`} disabled={!can}
+                            title={can ? (on ? 'Ticked. Tap to untick.' : 'Tap to tick.') : 'Registration is closed for this date'}
+                            onClick={() => void toggle(m, d, !on)}>{on ? '✓ ' : ''}{fmtShort(d.on_date)}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {liveDates.length > 0 && (
               <div className="stack" style={{ gap: 6 }}>
-                <span className="small muted">Tick a new person for:</span>
+                <span className="small muted">{onList.length ? 'Not them? Tick a new person for:' : 'Tick a new person for:'}</span>
                 <DateChips dates={tickable} value={chosen} onChange={setPick} />
               </div>
             )}
@@ -173,8 +200,8 @@ export function TrackerGridPage() {
                 <button className="btn small primary" onClick={() => void addExisting(c)}>{c.was_removed ? 'Bring back' : 'Add to list'}</button>
               </div>
             ))}
-            {!results.length && !search2.isFetching && <p className="muted small" style={{ margin: 0 }}>{rows.length ? 'No one else in the people register matches.' : 'Not found anywhere yet.'}</p>}
-            <button className="btn" onClick={() => setDlg('create')}><Icon name="plus" size={16} />Add “{typed}” as a new person</button>
+            {!results.length && !search2.isFetching && <p className="muted small" style={{ margin: 0 }}>{onList.length ? 'No one else in the people register matches.' : rows.length ? 'Nobody else in the people register matches.' : 'Not found anywhere yet.'}</p>}
+            <button className={onList.length ? 'btn small ghost' : 'btn'} onClick={() => setDlg('create')}><Icon name="plus" size={16} />{onList.length ? 'Not them? Add' : 'Add'} “{typed}” as a new person</button>
           </div>
         )}
       </div>
@@ -246,7 +273,7 @@ export function TrackerGridPage() {
       {dlg === 'import' && <ImportDialog eventId={eventId} listId={listId} eventName={g.list.event_name} dates={liveDates} onClose={() => setDlg(null)} onDone={reload} />}
       {dlg === 'followup' && <FollowUpDialog grid={g} onClose={() => setDlg(null)} />}
       {dlg === 'export' && <ExportDialog eventId={eventId} listId={listId} eventName={g.list.event_name} canContact={perms.contact} grid={g} onClose={() => setDlg(null)} />}
-      {dlg === 'create' && <CreateDialog listId={listId} name={typed} dates={tickable} chosen={chosen} onClose={() => setDlg(null)}
+      {dlg === 'create' && <CreateDialog listId={listId} name={typed} listRows={active} dates={tickable} chosen={chosen} onClose={() => setDlg(null)}
         onDone={() => { setSearch(''); setDlg(null); reload(); }} />}
       {rowDlg && <RowDialog row={g.rows.find((r) => r.entry_id === rowDlg.entry_id) ?? rowDlg} perms={perms} onClose={() => setRowDlg(null)} onDone={reload} />}
       {dateDlg && <EditDateDialog d={g.dates.find((x) => x.id === dateDlg.id) ?? dateDlg} onClose={() => setDateDlg(null)} onDone={reload} />}
@@ -267,6 +294,17 @@ function DateChips({ dates, value, onChange }: { dates: TrackerDate[]; value: Se
   );
 }
 
+const TITLE_WORDS = new Set(['brother', 'sister', 'deacon', 'priest', 'evangelist', 'elder', 'apostle', 'bishop', 'mr', 'mrs', 'ms', 'dr']);
+const nameTokens = (n: string) => n.toLowerCase().replace(/[^a-z\s'-]/g, ' ').split(/\s+/).filter((t) => t.length >= 2 && !TITLE_WORDS.has(t));
+/** People on this list whose name contains what was typed (or the other way round), so a duplicate is noticed before it is made. */
+function onListMatches(rows: TrackerRow[], typed: string): TrackerRow[] {
+  const t = nameTokens(typed);
+  if (!t.length) return [];
+  return rows.filter((r) => {
+    const n = nameTokens(r.name);
+    return t.every((x) => n.some((y) => y.startsWith(x) || x.startsWith(y))) || (n.length > 0 && n.every((y) => t.some((x) => y.startsWith(x) || x.startsWith(y))));
+  });
+}
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
 function DateDialog({ listId, multi, onClose, onDone }: { listId: string; multi: boolean; onClose: () => void; onDone: () => void }) {
@@ -353,19 +391,22 @@ function RowDialog({ row, perms, onClose, onDone }: { row: TrackerRow; perms: { 
   );
 }
 
-function CreateDialog({ listId, name, dates, chosen, onClose, onDone }: { listId: string; name: string; dates: TrackerDate[]; chosen: Set<string>; onClose: () => void; onDone: () => void }) {
+function CreateDialog({ listId, name, listRows, dates, chosen, onClose, onDone }: { listId: string; name: string; listRows: TrackerRow[]; dates: TrackerDate[]; chosen: Set<string>; onClose: () => void; onDone: () => void }) {
   const { areas, titles, voices } = useLookups();
   const toast = useToast();
   const [v, setV] = useState<TrackerPersonInput>({ name, title_id: null, title_specify: '', area_id: null, voice_part_id: null, district: '', congregation: '', contact: '' });
   const [ticks, setTicks] = useState<Set<string>>(new Set(chosen));
   const [similar, setSimilar] = useState<TrackerCard[] | null>(null);
+  const [differ, setDiffer] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof TrackerPersonInput>(k: K, val: TrackerPersonInput[K]) => setV((p) => ({ ...p, [k]: val }));
   const title = titles.find((t) => t.id === v.title_id);
+  const onListNow = onListMatches(listRows, v.name);
   const submit = async (force: boolean) => {
     setErr('');
     if (v.name.trim().length < 2) return setErr('Please enter the full name.');
+    if (onListNow.length && !differ) return setErr('Someone like this is already on the list. Tick the box to confirm this is a different person.');
     if (title?.needs_specify && !v.title_specify.trim()) return setErr(`Please say which ${title.name} (for example the office).`);
     if (!contactOk(v.contact)) return setErr('Phone must look like +260 977 123 456, or be left empty.');
     setBusy(true);
@@ -396,25 +437,25 @@ function CreateDialog({ listId, name, dates, chosen, onClose, onDone }: { listId
   return (
     <Modal title="Add a new person" onClose={onClose}>
       <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); void submit(false); }} noValidate>
-        <Field label="Full name"><input className="input" value={v.name} maxLength={80} onChange={(e) => set('name', e.target.value)} autoFocus /></Field>
+        <Field label="Full name"><input className="input" value={v.name} maxLength={80} onChange={(e) => { set('name', e.target.value); setDiffer(false); }} autoFocus /></Field>
+        {onListNow.length > 0 && (
+          <div className="stack" style={{ gap: 6 }}>
+            <Alert kind="warn">{onListNow.length === 1 ? 'Someone with this name is already on the list:' : 'People with this name are already on the list:'} <b>{onListNow.slice(0, 3).map((m) => m.name).join(', ')}</b>.</Alert>
+            <label className="check small"><input type="checkbox" checked={differ} onChange={(e) => setDiffer(e.target.checked)} />This is a different person. Add them anyway.</label>
+          </div>
+        )}
         <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
           <div className="grow"><Field label="Title (optional)">
-            <select className="input" value={v.title_id ?? ''} onChange={(e) => set('title_id', e.target.value || null)}>
-              <option value="">No title</option>
-              {titles.filter((t) => t.active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select></Field></div>
+            <Combo ariaLabel="Title" none="No title" placeholder="No title" value={v.title_id} onChange={(id) => set('title_id', id)}
+              options={titles.filter((t) => t.active).map((t) => ({ id: t.id, label: t.name }))} /></Field></div>
           <div className="grow"><Field label="Voice">
-            <select className="input" value={v.voice_part_id ?? ''} onChange={(e) => set('voice_part_id', e.target.value || null)}>
-              <option value="">Not set</option>
-              {voices.filter((t) => t.active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select></Field></div>
+            <Combo ariaLabel="Voice" none="Not set" placeholder="Not set" value={v.voice_part_id} onChange={(id) => set('voice_part_id', id)}
+              options={voices.filter((t) => t.active).map((t) => ({ id: t.id, label: t.name }))} /></Field></div>
         </div>
         {title?.needs_specify && <Field label={`Specify ${title.name.toLowerCase()}`}><input className="input" value={v.title_specify} maxLength={60} onChange={(e) => set('title_specify', e.target.value)} /></Field>}
         <Field label="Area" hint="Left empty, it follows the list name when possible.">
-          <select className="input" value={v.area_id ?? ''} onChange={(e) => set('area_id', e.target.value || null)}>
-            <option value="">Choose…</option>
-            {areas.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          <Combo ariaLabel="Area" placeholder="Type or choose an area" value={v.area_id} onChange={(id) => set('area_id', id)}
+            options={areas.filter((a) => a.active).map((a) => ({ id: a.id, label: a.name }))} />
         </Field>
         <Field label="District"><DistrictInput value={v.district} onChange={(d) => set('district', d)} compact /></Field>
         <Field label="Congregation"><DistrictInput kind="congregation" value={v.congregation} onChange={(d) => set('congregation', d)} compact /></Field>
@@ -434,21 +475,24 @@ function CreateDialog({ listId, name, dates, chosen, onClose, onDone }: { listId
 
 function ExportDialog({ eventId, listId, eventName, canContact, grid, onClose }: { eventId: string; listId: string; eventName: string; canContact: boolean; grid: TrackerGrid; onClose: () => void }) {
   const [contact, setContact] = useState(false);
+  const [date, setDate] = useState('');
+  const [absent, setAbsent] = useState(false);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const run = async (kind: 'xlsx' | 'pdf' | 'report') => {
     setErr(''); setBusy(kind);
     try {
       const x = await import('../../lib/trackerExport');
-      await api.logExport('tracker_list', listId, kind === 'report' ? 'pdf-report' : kind, { rows: grid.rows.length, contact: contact && canContact });
-      if (kind === 'report') await x.trackerReportPdf(await api.trackerAnalytics(eventId, listId, null));
-      else await x.exportTrackerGrid(eventName, [grid], contact && canContact, kind);
+      await api.logExport('tracker_list', listId, kind === 'report' ? 'pdf-report' : kind, { rows: grid.rows.length, contact: contact && canContact, date: date || 'all' });
+      if (kind === 'report') await x.trackerReportPdf(await api.trackerAnalytics(eventId, listId, date || null));
+      else await x.exportTrackerGrid(eventName, [grid], contact && canContact, kind, { date: date || null, includeAbsent: absent });
     } catch (e) { setErr(errMsg(e)); } finally { setBusy(''); }
   };
   return (
     <Modal title="Export this list" onClose={onClose}>
       <div className="stack">
         <p className="muted small" style={{ margin: 0 }}>Each export is recorded in the audit log.</p>
+        <ExportDate dates={grid.dates.filter((d) => !d.removed && d.started !== false)} date={date} onDate={setDate} absent={absent} onAbsent={setAbsent} />
         {canContact && <label className="check"><input type="checkbox" checked={contact} onChange={(e) => setContact(e.target.checked)} />Include phone numbers</label>}
         <button className="btn block" disabled={!!busy} onClick={() => void run('xlsx')}>{busy === 'xlsx' ? 'Preparing…' : 'Excel: names and ticks'}</button>
         <button className="btn block" disabled={!!busy} onClick={() => void run('pdf')}>{busy === 'pdf' ? 'Preparing…' : 'PDF: names and ticks'}</button>

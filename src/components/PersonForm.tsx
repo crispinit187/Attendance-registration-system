@@ -4,6 +4,7 @@ import { contactOk, errMsg, formatContactInput } from '../lib/format';
 import type { ProfileInput } from '../lib/types';
 import { Alert, Field, Loading } from './ui';
 import { DistrictInput } from './DistrictInput';
+import { Combo } from './Combobox';
 
 export const emptyProfile: ProfileInput = {
   title_id: null, title_specify: '', full_name: '', area_id: null, voice_part_id: null, district: '', contact: '', congregation: '',
@@ -48,10 +49,8 @@ export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extr
     <form className="stack" style={{ gap: 14 }} onSubmit={submit} noValidate>
       {!nameOnly && (
         <Field label={staff ? 'Title (optional)' : 'Title'}>
-          <select className="input" value={v.title_id ?? ''} onChange={(e) => set('title_id', e.target.value || null)}>
-            <option value="">Choose…</option>
-            {titles.filter((t) => t.active || t.id === v.title_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <Combo ariaLabel="Title" placeholder="Type or choose a title" value={v.title_id} onChange={(id) => set('title_id', id)}
+            options={titles.filter((t) => t.active || t.id === v.title_id).map((t) => ({ id: t.id, label: t.name }))} />
         </Field>
       )}
       {title?.needs_specify && (
@@ -66,16 +65,12 @@ export function PersonForm({ initial = emptyProfile, submitLabel, onSubmit, extr
         <>
           <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
             <div className="grow"><Field label="Area">
-              <select className="input" value={v.area_id ?? ''} onChange={(e) => set('area_id', e.target.value || null)}>
-                <option value="">Choose…</option>
-                {areas.filter((a) => (a.active && (!areaIds?.length || areaIds.includes(a.id))) || a.id === v.area_id).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <Combo ariaLabel="Area" placeholder="Type or choose an area" value={v.area_id} onChange={(id) => set('area_id', id)}
+                options={areas.filter((a) => (a.active && (!areaIds?.length || areaIds.includes(a.id))) || a.id === v.area_id).map((a) => ({ id: a.id, label: a.name }))} />
             </Field></div>
             <div className="grow"><Field label="Voice part">
-              <select className="input" value={v.voice_part_id ?? ''} onChange={(e) => set('voice_part_id', e.target.value || null)}>
-                <option value="">Choose…</option>
-                {voices.filter((a) => (a.active && (!voiceIds?.length || voiceIds.includes(a.id))) || a.id === v.voice_part_id).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <Combo ariaLabel="Voice part" placeholder="Type or choose a voice" value={v.voice_part_id} onChange={(id) => set('voice_part_id', id)}
+                options={voices.filter((a) => (a.active && (!voiceIds?.length || voiceIds.includes(a.id))) || a.id === v.voice_part_id).map((a) => ({ id: a.id, label: a.name }))} />
             </Field></div>
           </div>
           <Field label="District">

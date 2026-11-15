@@ -435,3 +435,28 @@ table.tgrid { border-collapse: separate; border-spacing: 0; font-size: .92rem; m
 .dstate.on { background: color-mix(in srgb, var(--ok, #2f9e6f) 16%, transparent); color: var(--ok, #2f9e6f); border-color: color-mix(in srgb, var(--ok, #2f9e6f) 45%, transparent); }
 .dstate:hover:not(.static) { border-color: var(--accent, currentColor); }
 .dstate.static { cursor: default; }
+
+/* Typing dropdowns (Combo / SuggestInput) */
+.combo { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.combo > .input { width: 100%; padding-right: 34px; }
+.combo-x { position: absolute; right: 6px; top: 6px; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.combo-x:hover { color: var(--text); background: var(--surface2); }
+.combo-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, var(--bg)); box-shadow: 0 6px 18px rgba(0,0,0,.18); padding: 4px; animation: combo-in .12s ease-out; }
+.combo-opt { display: block; width: 100%; text-align: left; padding: 11px 12px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.combo-opt.on, .combo-opt:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.combo-hit { color: var(--accent); }
+.combo-empty, .combo-note { padding: 10px 12px; color: var(--muted); font-size: 13px; }
+@keyframes combo-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .combo-list { animation: none; } }
+
+/* Light / dark blend */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.theme-blend::view-transition-new(root) { animation: theme-reveal .6s cubic-bezier(.4, 0, .2, 1) both; }
+.theme-blend::view-transition-old(root) { animation: none; z-index: 0; }
+@keyframes theme-reveal {
+  from { clip-path: circle(0 at var(--blend-x, 100%) var(--blend-y, 0)); }
+  to { clip-path: circle(150vmax at var(--blend-x, 100%) var(--blend-y, 0)); }
+}
+.theme-fade, .theme-fade *, .theme-fade *::before, .theme-fade *::after {
+  transition: background-color .45s ease, color .45s ease, border-color .45s ease, fill .45s ease, stroke .45s ease, box-shadow .45s ease !important;
+}

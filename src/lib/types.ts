@@ -3,6 +3,7 @@ export type Role = 'admin' | 'manager' | 'list_manager' | 'reviewer' | 'registra
 export interface Account {
   id: string; email: string | null; full_name: string | null; role: Role;
   person_id: string | null; must_set_password: boolean; disabled: boolean; created_at: string;
+  phone?: string | null;
   access_scope: 'all' | 'selected';   // registrars and reviewers: everything, or only what was granted
 }
 export interface AccountStatus { id: string; verified_at: string | null; last_sign_in_at: string | null; invited_at: string | null }
@@ -103,7 +104,7 @@ export type JoinResult =
   | { status: 'similar'; match: string };
 
 /** Someone who works on an event or sign-up list: its managers first, then the registrars and reviewers given it. */
-export interface TeamMember { grant_id: string; account_id: string; name: string; email: string | null; role: Role; disabled: boolean; level?: 'event' | 'list' }
+export interface TeamMember { grant_id: string; account_id: string; name: string; email: string | null; role: Role; disabled: boolean; level?: 'event' | 'list'; list_id?: string | null; list_title?: string | null }
 
 // ---- Trackers ----
 export interface TrackerListSummary {

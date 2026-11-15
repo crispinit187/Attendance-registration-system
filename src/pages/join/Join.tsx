@@ -6,6 +6,7 @@ import { contactOk, errMsg, formatContactInput } from '../../lib/format';
 import type { JoinInfo } from '../../lib/types';
 import { Alert, BrandLabel, Icon, Loading } from '../../components/ui';
 import { Turnstile, turnstileEnabled } from '../../components/Turnstile';
+import { Combo } from '../../components/Combobox';
 
 const empty: JoinForm = { title_id: null, title_specify: '', full_name: '', area_id: null, voice_part_id: null, district: '', contact: '' };
 
@@ -138,10 +139,8 @@ export function Join() {
 
                 <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
                   <label className="field grow"><span>Area</span>
-                    <select className="input" value={f.area_id ?? ''} onChange={(e) => set('area_id', e.target.value || null)}>
-                      <option value="">Choose…</option>
-                      {d.areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
+                    <Combo ariaLabel="Area" placeholder="Type or choose" value={f.area_id} onChange={(id) => set('area_id', id)}
+                      options={d.areas.map((a) => ({ id: a.id, label: a.name }))} />
                   </label>
                   <label className="field grow"><span>District</span>
                     <input className="input" placeholder="Type it in" maxLength={60} autoComplete="off" value={f.district} onChange={(e) => set('district', e.target.value)} />

@@ -62,7 +62,8 @@ export function HeaderActions() {
     <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
       {role !== 'member' && <SearchButton />}
       {['admin', 'manager', 'list_manager', 'registrar'].includes(role) && <RecentActionsButton />}
-      <button className="iconbtn" onClick={toggle} aria-label="Switch between light and dark" title="Light / dark"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
+      {role !== 'member' && <NavLink className="iconbtn" to="/account" aria-label="My account" title="My account"><Icon name="user" /></NavLink>}
+      <button className="iconbtn" onClick={(e) => toggle(e)} aria-label="Switch between light and dark" title="Light / dark"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
       <SignOutButton className="iconbtn" label="Sign out" title="Sign out"><Icon name="out" /></SignOutButton>
     </div>
   );

@@ -6,6 +6,7 @@ import { parsePaste, type ParsedLine } from '../../lib/pasteParse';
 import { displayName, errMsg } from '../../lib/format';
 import type { PasteResult, SignupDetailInfo } from '../../lib/types';
 import { Alert, Field, useToast } from '../../components/ui';
+import { Combo } from '../../components/Combobox';
 
 const LABEL = { new: 'New', already: 'Already on the list', similar: 'Looks similar', invalid: 'Problem', added: 'Added', skipped: 'Not added' } as const;
 const CLASS = { new: 'pv-new', already: 'pv-warn', similar: 'pv-warn', invalid: 'pv-bad', added: 'pv-new', skipped: 'muted' } as const;
@@ -63,19 +64,16 @@ export function PasteTab({ list }: { list: SignupDetailInfo }) {
         </p>
         <div className="grid c2">
           <Field label="Title for lines without one">
-            <select className="input" value={def.title_id ?? ''} onChange={(e) => { setDef({ ...def, title_id: e.target.value || null }); stale(); }}>
-              <option value="">None</option>{lk.titles.filter((t) => t.active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <Combo ariaLabel="Title" none="None" placeholder="None" value={def.title_id} onChange={(id) => { setDef({ ...def, title_id: id }); stale(); }}
+              options={lk.titles.filter((t) => t.active).map((t) => ({ id: t.id, label: t.name }))} />
           </Field>
           <Field label="Area for lines without one">
-            <select className="input" value={def.area_id ?? ''} onChange={(e) => { setDef({ ...def, area_id: e.target.value || null }); stale(); }}>
-              <option value="">None</option>{areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            <Combo ariaLabel="Area" none="None" placeholder="None" value={def.area_id} onChange={(id) => { setDef({ ...def, area_id: id }); stale(); }}
+              options={areas.map((a) => ({ id: a.id, label: a.name }))} />
           </Field>
           <Field label="Voice part for lines without one">
-            <select className="input" value={def.voice_part_id ?? ''} onChange={(e) => { setDef({ ...def, voice_part_id: e.target.value || null }); stale(); }}>
-              <option value="">None</option>{voices.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
+            <Combo ariaLabel="Voice part" none="None" placeholder="None" value={def.voice_part_id} onChange={(id) => { setDef({ ...def, voice_part_id: id }); stale(); }}
+              options={voices.map((v) => ({ id: v.id, label: v.name }))} />
           </Field>
           <Field label="District for lines without one">
             <input className="input" maxLength={60} placeholder="For example Woodlands" value={def.district} onChange={(e) => { setDef({ ...def, district: e.target.value }); stale(); }} />
