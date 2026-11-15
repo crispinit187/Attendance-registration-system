@@ -1,7 +1,7 @@
 // Exports for trackers (Excel grid, PDF grid) and the PDF analytics report (used by trackers and attendance events).
 import type { Breakdown, TrackerAnalytics, TrackerGrid } from './types';
 import { download, fmtDateTime, safeName } from './format';
-import { DEFAULT_EXPECTED, fmtD, fmtShort, headline, hourLabel, pct, sumBy, totals } from './trackerStats';
+import { baseOf, fmtD, fmtShort, headline, hourLabel, pct, sumBy, totals } from './trackerStats';
 
 type Cell = string | number | null;
 
@@ -200,11 +200,11 @@ export async function trackerReportPdf(a: TrackerAnalytics) {
     title: `${a.event.name} · attendance report`,
     subtitle: `${a.date ? fmtD(a.date) : 'All dates'} · ${a.lists.length} list(s) · created ${fmtDateTime(new Date().toISOString())}`,
     headline: headline(a),
-    stats: [['Attended', String(t.present)], ['Registered', String(t.people)], ['Of expected', `${pct(t.present, t.expected)}%`],
+    stats: [['Attended', String(t.present)], ['Registered', String(t.people)], [`Of ${t.basis}`, `${pct(t.present, t.expected)}%`],
       ['Came every date', String(a.lists.reduce((s, l) => s + l.every_date, 0))], ['Never ticked', String(a.lists.reduce((s, l) => s + l.never, 0))]],
-    bars: { title: 'Attendance against what was expected', rows: a.lists.map((l) => ({ label: l.title, value: l.present, of: l.expected ?? DEFAULT_EXPECTED, text: `${l.present} of ${l.expected ?? DEFAULT_EXPECTED} (${pct(l.present, l.expected ?? DEFAULT_EXPECTED)}%)` })) },
+    bars: { title: t.basis === 'registered' ? 'Attendance against the people registered' : 'Attendance against what was expected', rows: a.lists.map((l) => ({ label: l.title, value: l.present, of: baseOf(l), text: `${l.present} of ${baseOf(l)} ${l.expected != null ? 'expected' : 'registered'} (${pct(l.present, baseOf(l))}%)` })) },
     sections: [
-      { title: 'Lists', head: ['List', 'Registered', 'Attended', 'Expected', 'Every date', 'Never'], body: a.lists.map((l) => [l.title, l.people, l.present, l.expected ?? DEFAULT_EXPECTED, l.every_date, l.never]) },
+      { title: 'Lists', head: ['List', 'Registered', 'Attended', 'Expected', 'Every date', 'Never'], body: a.lists.map((l) => [l.title, l.people, l.present, l.expected ?? '-', l.every_date, l.never]) },
       { title: 'Attendance by date', head: ['List', 'Date', 'Present'], body: a.trend.map((x) => [nameOf.get(x.list_id) ?? '', fmtD(x.on_date), x.present]) },
       { title: 'By voice part', head: ['Voice part', 'People'], body: voices.map((v) => [v.name, v.n]) },
       { title: 'By title', head: ['Title', 'People'], body: titles.map((v) => [v.name, v.n]) },

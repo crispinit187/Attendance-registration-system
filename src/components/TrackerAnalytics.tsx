@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { errMsg } from '../lib/format';
 import type { TrackerAnalytics as A } from '../lib/types';
-import { COLORS, DEFAULT_EXPECTED, fmtD, fmtShort, headline, hourLabel, pct, sumBy, totals } from '../lib/trackerStats';
+import { COLORS, baseOf, fmtD, fmtShort, headline, hourLabel, pct, sumBy, totals } from '../lib/trackerStats';
 import { Alert, Loading } from './ui';
 
 function Bar({ label, n, max, cls = '', right }: { label: string; n: number; max: number; cls?: string; right?: string }) {
@@ -38,7 +38,7 @@ export function TrackerAnalytics({ eventId, listId = null }: { eventId: string; 
   const t = totals(a);
   const color = new Map(allLists.map((l, i) => [l.id, COLORS[i % COLORS.length]!]));
   const titleOf = new Map(allLists.map((l) => [l.id, l.title]));
-  const maxExp = Math.max(1, ...a.lists.map((l) => Math.max(l.present, l.expected ?? DEFAULT_EXPECTED)));
+  const maxExp = Math.max(1, ...a.lists.map((l) => Math.max(l.present, baseOf(l))));
   const multi = a.lists.length > 1;
 
   const voices = sumBy(a.voices);
@@ -76,17 +76,17 @@ export function TrackerAnalytics({ eventId, listId = null }: { eventId: string; 
       <div className="statrow">
         <div className="stat"><b>{t.present}</b><span>{date ? 'Present that day' : 'Attended at least once'}</span></div>
         <div className="stat"><b>{t.people}</b><span>Registered</span></div>
-        <div className="stat"><b>{pct(t.present, t.expected)}%</b><span>Of {t.expected} expected</span></div>
+        <div className="stat"><b>{pct(t.present, t.expected)}%</b><span>Of {t.expected} {t.basis}</span></div>
         <div className="stat"><b>{a.lists.reduce((s, l) => s + l.every_date, 0)}</b><span>Came every date</span></div>
         <div className="stat"><b>{a.lists.reduce((s, l) => s + l.never, 0)}</b><span>Never ticked</span></div>
       </div>
 
-      <Block title="Attendance against what was expected">
+      <Block title={t.basis === 'registered' ? 'Attendance against the people registered' : 'Attendance against what was expected'}>
         {a.lists.map((l, i) => (
           <Bar key={l.id} label={l.title} n={l.present} max={maxExp} cls={COLORS[i % COLORS.length]}
-            right={`${l.present} of ${l.expected ?? DEFAULT_EXPECTED} expected (${pct(l.present, l.expected ?? DEFAULT_EXPECTED)}%) · ${l.people} registered`} />
+            right={l.expected != null ? `${l.present} of ${l.expected} expected (${pct(l.present, l.expected)}%) · ${l.people} registered` : `${l.present} of ${l.people} registered (${pct(l.present, l.people)}%)`} />
         ))}
-        <p className="muted small" style={{ margin: 0 }}>The expected number is set per list ({DEFAULT_EXPECTED} unless changed).</p>
+        <p className="muted small" style={{ margin: 0 }}>An expected number is optional and is set per list. A list without one is compared with the people registered on it.</p>
       </Block>
 
       {dts.length > 0 && (

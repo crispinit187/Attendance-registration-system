@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { errMsg } from '../../lib/format';
-import { DEFAULT_EXPECTED, fmtShort } from '../../lib/trackerStats';
+import { fmtShort } from '../../lib/trackerStats';
 import type { TrackerListSummary } from '../../lib/types';
 import { Alert, Badge, ConfirmDialog, Field, Icon, Loading, Modal, useToast } from '../../components/ui';
 import { TeamPanel } from '../../components/TeamPanel';
@@ -78,7 +78,7 @@ export function TrackerEventPage() {
             </div>
             <div className="muted small">
               {l.people} {l.people === 1 ? 'person' : 'people'} · {l.dates} {l.dates === 1 ? 'date' : 'dates'}
-              {l.last_date ? ` · last ${fmtShort(l.last_date)}: ${l.present_last} present` : ''} · expected {l.expected ?? DEFAULT_EXPECTED}
+              {l.last_date ? ` · last ${fmtShort(l.last_date)}: ${l.present_last} present` : ''}{l.expected != null ? ` · expected ${l.expected}` : ''}
             </div>
             {canEdit && !ev.archived_at && (
               <div className="row">
@@ -126,18 +126,18 @@ function RenameDialog({ name, onSave, onClose }: { name: string; onSave: (n: str
 
 function ListForm({ eventId, list, onClose, onDone }: { eventId: string; list: TrackerListSummary | null; onClose: () => void; onDone: () => void }) {
   const [title, setTitle] = useState(list?.title ?? '');
-  const [exp, setExp] = useState(String(list?.expected ?? DEFAULT_EXPECTED));
+  const [exp, setExp] = useState(list?.expected != null ? String(list.expected) : '');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   return (
     <Modal title={list ? 'Edit list' : 'Add a list'} onClose={onClose}>
       <form className="stack" onSubmit={async (e) => {
         e.preventDefault(); setErr(''); setBusy(true);
-        try { await api.trackerSaveList(list?.id ?? null, eventId, title.trim(), Number(exp) || DEFAULT_EXPECTED); onDone(); onClose(); }
+        try { await api.trackerSaveList(list?.id ?? null, eventId, title.trim(), exp.trim() === '' ? null : Number(exp)); onDone(); onClose(); }
         catch (x) { setErr(errMsg(x)); setBusy(false); }
       }}>
         <Field label="List name" hint="For example East, or Choir A."><input className="input" value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} autoFocus /></Field>
-        <Field label="Expected attendance" hint="Used in the analytics to compare who came with who was expected."><input className="input" inputMode="numeric" value={exp} onChange={(e) => setExp(e.target.value.replace(/\D/g, ''))} /></Field>
+        <Field label="Expected attendance (optional)" hint="Leave it empty if you have no target. The analytics then compare against the people registered on the list."><input className="input" inputMode="numeric" placeholder="Optional" value={exp} onChange={(e) => setExp(e.target.value.replace(/\D/g, ''))} /></Field>
         {err && <Alert>{err}</Alert>}
         <button className="btn primary block" disabled={busy || title.trim().length < 2}>{busy ? 'Saving…' : 'Save list'}</button>
       </form>

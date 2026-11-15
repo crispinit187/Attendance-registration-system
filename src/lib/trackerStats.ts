@@ -1,6 +1,11 @@
 import type { TrackerAnalytics } from './types';
 
-export const DEFAULT_EXPECTED = 200;
+/** A list's yardstick: its expected number when one was set, otherwise the people registered on it. */
+export const baseOf = (l: { expected: number | null; people: number }) => l.expected ?? l.people;
+export const basisOf = (lists: { expected: number | null }[]): 'expected' | 'registered' | 'expected or registered' => {
+  const n = lists.filter((l) => l.expected != null).length;
+  return n === 0 ? 'registered' : n === lists.length ? 'expected' : 'expected or registered';
+};
 export const COLORS = ['c1', 'c2', 'c3', 'c4'];
 export const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
@@ -11,8 +16,8 @@ export const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ?
 export function totals(a: TrackerAnalytics) {
   const present = a.lists.reduce((s, l) => s + l.present, 0);
   const people = a.lists.reduce((s, l) => s + l.people, 0);
-  const expected = a.lists.reduce((s, l) => s + (l.expected ?? DEFAULT_EXPECTED), 0);
-  return { present, people, expected };
+  const expected = a.lists.reduce((s, l) => s + baseOf(l), 0);
+  return { present, people, expected, basis: basisOf(a.lists) };
 }
 
 /** Sum rows by name across lists. */
@@ -27,5 +32,5 @@ export function headline(a: TrackerAnalytics): string {
   const when = a.date ? `on ${fmtD(a.date)}` : 'across all dates';
   const listWord = a.lists.length === 1 ? a.lists[0]!.title : `${a.lists.length} lists`;
   if (!t.people) return `No one is registered on ${listWord} yet.`;
-  return `${t.present} ${t.present === 1 ? 'person' : 'people'} attended ${when} (${listWord}), ${pct(t.present, t.expected)}% of the ${t.expected} expected and ${pct(t.present, t.people)}% of the ${t.people} registered.`;
+  return `${t.present} ${t.present === 1 ? 'person' : 'people'} attended ${when} (${listWord}), ${pct(t.present, t.expected)}% of the ${t.expected} ${t.basis}${t.basis === 'registered' ? '' : ` and ${pct(t.present, t.people)}% of the ${t.people} registered`}.`;
 }

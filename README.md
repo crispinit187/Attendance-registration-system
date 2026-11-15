@@ -162,3 +162,6 @@ Run `supabase/sql/18_started_dates.sql` after `17_open_close_dates.sql`. A track
 
 ## My recent actions (run `22_recent_actions.sql` after 21)
 The panel now lists a week of your actions with "Load more", and records the actions that were missing: removing or restoring a person, adding, changing, removing or restoring a date column, opening or closing a column, and changing a title. Undo (24 hours) now also covers removing or restoring a person and opening or closing a column; date add, change and remove are listed but cannot be undone. Adding a person with dates says how many dates were chosen. Imports are not listed here (they stay in the audit log). Do not re-run `17_open_close_dates.sql` after 22.
+
+## Expected number on a tracker list
+The expected number is optional. Leave it empty and the analytics and PDF report compare attendance with the people registered on that list; set it and they compare with the expected number (no hidden default of 200).
