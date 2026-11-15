@@ -276,8 +276,6 @@ body:has(.shell:not(.admin) .bottomnav) .page { padding-bottom: 16px; }   /* the
 .landing { min-height: 100dvh; display: flex; flex-direction: column; }
 .land-hero { box-sizing: border-box; padding: 26px 20px 24px; background: var(--hero-bg); color: var(--hero-text); }
 .land-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; line-height: 1.15; }
-.land-brand .logosvg rect { fill: var(--logo-bg, var(--accent)); }
-.land-brand .logosvg path { stroke: var(--logo-ink, var(--accent-ink)); }
 .land-hero h2 { font-family: var(--serif); font-weight: 600; font-size: 28px; line-height: 1.15; letter-spacing: -.01em; margin: 22px 0 0; }
 .land-hero p { margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: var(--hero-muted); }
 .land-main { flex: 1; box-sizing: border-box; padding: 24px 20px 28px; display: flex; flex-direction: column; align-items: center; gap: 30px; }

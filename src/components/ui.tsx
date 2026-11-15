@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useState, type ReactNode } from 'react';
 
 const paths: Record<string, string> = {
   check: 'M5 12l5 5 9-11',
@@ -42,10 +42,20 @@ export function Icon({ name, size = 20 }: { name: keyof typeof paths | string; s
 }
 
 export function Logo({ size = 44 }: { size?: number }) {
+  const id = useId().replace(/:/g, '');
   return (
-    <svg className="logosvg" width={size} height={size} viewBox="0 0 44 44" aria-hidden="true">
-      <rect x="2" y="2" width="40" height="40" rx="12" fill="var(--accent)" />
-      <path d="M13 23l6 6 12-13" fill="none" stroke="var(--accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg className="logosvg" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id={`${id}b`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1b3a63" /><stop offset=".55" stopColor="#10223d" /><stop offset="1" stopColor="#08111f" /></linearGradient>
+        <radialGradient id={`${id}l`} cx=".3" cy=".2" r=".9"><stop offset="0" stopColor="#3b82ff" stopOpacity=".45" /><stop offset="1" stopColor="#3b82ff" stopOpacity="0" /></radialGradient>
+        <linearGradient id={`${id}r`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#5aa0ff" /><stop offset="1" stopColor="#12a594" /></linearGradient>
+        <linearGradient id={`${id}t`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#cfe0ff" /></linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="15" fill={`url(#${id}b)`} />
+      <rect width="64" height="64" rx="15" fill={`url(#${id}l)`} />
+      <circle cx="32" cy="32" r="18" fill="none" stroke="#fff" strokeOpacity=".12" strokeWidth="5" />
+      <circle cx="32" cy="32" r="18" fill="none" stroke={`url(#${id}r)`} strokeWidth="5" strokeLinecap="round" strokeDasharray="86 113" transform="rotate(-70 32 32)" />
+      <path d="M23 33l6.5 6.5L42 24" fill="none" stroke={`url(#${id}t)`} strokeWidth="5.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
