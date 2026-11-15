@@ -159,3 +159,6 @@ Run `supabase/sql/18_started_dates.sql` after `17_open_close_dates.sql`. A track
   - In Supabase, Authentication, Email templates, the **Change email address** template link must go to `{{ .SiteURL }}/#/auth/confirm?token_hash={{ .TokenHash }}&type=email_change`, like your other templates.
   - Authentication, Providers, Email: "Secure email change" on means both old and new addresses must confirm. Built-in email is rate-limited, so use custom SMTP in production.
 - **Theme switch** blends with a circular reveal from the button (a plain fade on older browsers, none if the device asks for reduced motion).
+
+## My recent actions (run `22_recent_actions.sql` after 21)
+The panel now lists a week of your actions with "Load more", and records the actions that were missing: removing or restoring a person, adding, changing, removing or restoring a date column, opening or closing a column, and changing a title. Undo (24 hours) now also covers removing or restoring a person and opening or closing a column; date add, change and remove are listed but cannot be undone. Adding a person with dates says how many dates were chosen. Imports are not listed here (they stay in the audit log). Do not re-run `17_open_close_dates.sql` after 22.
