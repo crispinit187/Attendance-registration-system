@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
-import { BrandLabel, Icon } from './ui';
+import { BrandLabel, Icon, Logo } from './ui';
 import { SignOutButton } from './SignOut';
 import { OfflineBar } from './OfflineBar';
 import { RecentActionsButton } from './RecentActions';
@@ -179,7 +179,7 @@ export function Shell() {
     <div className="shell admin">
       <nav className="sidenav" aria-label="Sections" ref={sideRef}>
         <span className="navpill" aria-hidden="true" />
-        <div className="brand" style={{ padding: '0 8px 18px', margin: 0, fontSize: 12 }}><svg width="36" height="36" viewBox="0 0 44 44" aria-hidden="true"><rect x="2" y="2" width="40" height="40" rx="12" fill="var(--accent)" /><path d="M13 23l6 6 12-13" fill="none" stroke="var(--accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" /></svg><div>Attendance<br />Registration</div></div>
+        <div className="brand" style={{ padding: '0 8px 18px', margin: 0, fontSize: 12 }}><Logo size={36} /><div>Attendance<br />Registration</div></div>
         {items
           ? items.map((i) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}>{i.label}</NavLink>)
           : <>{REVIEWER.map((i) => <a key={i.id} href="#" className={(active || 'rv-top') === i.id ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActive(i.id); jump(i.id); }}>{i.label}</a>)}<NavLink to="/trackers" className={({ isActive }) => (isActive ? 'active' : '')}>Trackers</NavLink></>}
