@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { errMsg } from '../../lib/format';
 import { Alert, Icon, Logo } from '../../components/ui';
@@ -53,6 +53,7 @@ export function SignupSteps({ at }: { at: 0 | 1 | 2 }) {
 }
 
 export function Login() {
+  const swapDir = useRef('fwd');
   const [mode, setMode] = useState<Mode>('in');
   const [step, setStep] = useState<Step>('account');
   const [email, setEmail] = useState('');
@@ -67,6 +68,12 @@ export function Login() {
 
   const go = (m: Mode) => { setMode(m); setStep('account'); setErr(''); setInfo(''); setDone(''); setReset((n) => n + 1); };
   const verifying = mode === 'up' && step === 'verify';
+  // Which way the panel slides: further along (sign in, create account, forgot, verify) moves left, going back moves right.
+  const rank = verifying ? 3 : mode === 'in' ? 0 : mode === 'up' ? 1 : 2;
+  const prevRank = useRef(rank);
+  const dir = rank > prevRank.current ? 'fwd' : rank < prevRank.current ? 'back' : prevRank.current === rank ? (swapDir.current) : 'fwd';
+  swapDir.current = dir; prevRank.current = rank;
+  const view = `${mode}-${verifying ? 'v' : done ? 'd' : 'f'}`;
   const [h1, sub] = verifying ? ['Verify your email', 'This keeps fake accounts out. It only takes a moment.'] : HEAD[mode];
 
   const friendly = (e: unknown) => {
@@ -133,24 +140,27 @@ export function Login() {
     <div className="landing">
       <aside className="land-hero">
         <div className="land-brand"><Logo size={36} /><div>Attendance<br />Registration System</div></div>
-        <h2>{mode === 'up' ? 'Set up once. After that, scanning is all it takes.' : 'Take attendance in seconds, not in notebooks.'}</h2>
-        <p>{mode === 'up' ? 'Your account keeps your attendance history in one place.' : 'One place to mark who was there, sign up new people and keep an honest record for every event.'}</p>
-        <LandList signup={mode === 'up'} />
+        <div key={mode === 'up' ? 'up' : 'in'} className="swap fade">
+          <h2>{mode === 'up' ? 'Set up once. After that, scanning is all it takes.' : 'Take attendance in seconds, not in notebooks.'}</h2>
+          <p>{mode === 'up' ? 'Your account keeps your attendance history in one place.' : 'One place to mark who was there, sign up new people and keep an honest record for every event.'}</p>
+          <LandList signup={mode === 'up'} />
+        </div>
       </aside>
       <main className="land-main">
       <div className="auth-card">
         {mode === 'up' && <SignupSteps at={step === 'verify' ? 1 : 0} />}
-        <div className="stack" style={{ gap: 6 }}>
+        <div key={`t-${view}`} className={`swap ${dir} stack`} style={{ gap: 6 }}>
           <h1 className="auth-title">{h1}</h1>
           <p className="auth-sub">{sub}</p>
         </div>
         {!verifying && (
-          <div className="tabs" role="tablist">
+          <div className="tabs" role="tablist" data-at={mode === 'up' ? 'up' : 'in'}>
             <button role="tab" aria-selected={mode !== 'up'} className={mode !== 'up' ? 'on' : ''} onClick={() => go('in')} type="button">Sign in</button>
             <button role="tab" aria-selected={mode === 'up'} className={mode === 'up' ? 'on' : ''} onClick={() => go('up')} type="button">Create account</button>
           </div>
         )}
 
+        <div key={view} className={`swap ${dir}`}>
         {verifying ? (
           <div className="stack" style={{ gap: 16 }}>
             <div className="verifyBox">
@@ -213,6 +223,7 @@ export function Login() {
             )}
           </form>
         )}
+        </div>
       </div>
       <section className="land-more">
         <h3>{mode === 'up' ? 'How it works' : 'What you can do here'}</h3>

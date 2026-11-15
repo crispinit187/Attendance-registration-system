@@ -90,7 +90,11 @@ textarea.input { min-height: 80px; resize: vertical; }
 svg.logosvg { flex: none; display: block; }
 .tabs { display: flex; gap: 6px; background: var(--surface); border: 1px solid var(--border); padding: 4px; border-radius: 14px; }
 .tabs button { flex: 1; border: 0; background: transparent; height: 44px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; color: var(--muted); }
-.tabs button.on { background: var(--accent); color: var(--accent-ink); }
+.tabs { position: relative; }
+.tabs::before { content: ''; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 5px); border-radius: 10px; background: var(--accent); transition: transform .32s var(--ease); }
+.tabs[data-at='up']::before { transform: translateX(calc(100% + 6px)); }
+.tabs button { position: relative; z-index: 1; transition: color .25s; }
+.tabs button.on { background: transparent; color: var(--accent-ink); }
 
 /* app shell */
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -461,3 +465,18 @@ table.tgrid { border-collapse: separate; border-spacing: 0; font-size: .92rem; m
 .theme-fade, .theme-fade *, .theme-fade *::before, .theme-fade *::after {
   transition: background-color .45s ease, color .45s ease, border-color .45s ease, fill .45s ease, stroke .45s ease, box-shadow .45s ease !important;
 }
+
+
+/* Sign in / create account: the panel slides, the pill glides, the hero text fades; sign-out fades the page */
+@keyframes swapFwd { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes swapBack { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+.swap.fwd { animation: swapFwd .34s var(--ease) both; }
+.swap.back { animation: swapBack .34s var(--ease) both; }
+.swap.fade { animation: fadeIn .4s var(--ease) both; }
+@keyframes landIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.landing .auth-card { animation: landIn .45s var(--ease) both; }
+.landing .land-hero > * { animation: landIn .5s var(--ease) both; }
+.landing .land-hero > :nth-child(2) { animation-delay: .06s; }
+#root { transition: opacity .26s ease; }
+.signing-out #root { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .swap, .landing .auth-card, .landing .land-hero > * { animation: none !important; } .tabs::before { transition: none; } }

@@ -19,7 +19,13 @@ export function SignOutButton({ className, title, label, children }: {
           title="Sign out?" confirmLabel="Sign out"
           body={<p>You will need to sign in again to continue.</p>}
           onClose={() => setAsking(false)}
-          onConfirm={async () => { await signOut(); }} />
+          onConfirm={async () => {
+            // Fade the page out first so the sign-in screen does not snap in.
+            const root = document.documentElement;
+            const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            if (!calm) { root.classList.add('signing-out'); await new Promise((r) => setTimeout(r, 280)); }
+            try { await signOut(); } finally { root.classList.remove('signing-out'); }
+          }} />
       )}
     </>
   );
