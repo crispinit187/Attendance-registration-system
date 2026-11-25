@@ -165,3 +165,6 @@ The panel now lists a week of your actions with "Load more", and records the act
 
 ## Expected number on a tracker list
 The expected number is optional. Leave it empty and the analytics and PDF report compare attendance with the people registered on that list; set it and they compare with the expected number (no hidden default of 200).
+
+## Phone layout
+On phones the top bar keeps search and light/dark and puts recent actions, My account and sign out in a "..." menu. The admin bottom tabs show four sections and a "More" tab for the rest. The page can no longer grow wider than the screen.

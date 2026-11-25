@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { RecentAction } from '../lib/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -6,11 +6,11 @@ import { errMsg, fmtDateTime } from '../lib/format';
 import { Alert, Badge, Icon, Loading, Modal, useToast } from './ui';
 
 /** The last things this person did, each with an Undo, for mistakes noticed a little later. */
-export function RecentActionsButton({ className = 'iconbtn' }: { className?: string }) {
+export function RecentActionsButton({ className = 'iconbtn', children }: { className?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className={className} onClick={() => setOpen(true)} aria-label="My recent actions" title="My recent actions"><Icon name="clock" /></button>
+      <button className={className} onClick={() => setOpen(true)} aria-label="My recent actions" title="My recent actions"><Icon name="clock" />{children}</button>
       {open && <RecentActions onClose={() => setOpen(false)} />}
     </>
   );

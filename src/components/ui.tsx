@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useState, typ
 
 const paths: Record<string, string> = {
   check: 'M5 12l5 5 9-11',
+  more: 'M4.6 12h.8M11.6 12h.8M18.6 12h.8',
   home: 'M3 11l9-8 9 8M5 10v10h14V10',
   scan: 'M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M4 12h16',
   clock: 'M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',

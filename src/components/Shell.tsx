@@ -54,10 +54,48 @@ const REGISTRAR = [
   { id: 'rg-add', label: 'Add', icon: 'plus' },
 ];
 
+/** True while the screen is phone-sized. */
+function useNarrow(px = 520) {
+  const q = `(max-width: ${px}px)`;
+  const [n, setN] = useState(() => window.matchMedia?.(q).matches ?? false);
+  useEffect(() => {
+    const m = window.matchMedia?.(q); if (!m) return;
+    const on = () => setN(m.matches); on(); m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [q]);
+  return n;
+}
+
 export function HeaderActions() {
   const { theme, toggle } = useTheme();
   const { account } = useAuth();
   const role = account?.role ?? 'member';
+  const narrow = useNarrow();
+  const [menu, setMenu] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const down = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setMenu(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false); };
+    document.addEventListener('pointerdown', down); document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('keydown', key); };
+  }, [menu]);
+  const canRecent = ['admin', 'manager', 'list_manager', 'registrar'].includes(role);
+  if (narrow && role !== 'member') {
+    // Phones: search and light/dark stay in the bar; the rest tuck into a small menu so everything fits.
+    return (
+      <div className="row hdr-compact" style={{ gap: 8, flexWrap: 'nowrap' }} ref={box}>
+        <SearchButton />
+        <button className="iconbtn" onClick={(e) => toggle(e)} aria-label="Switch between light and dark" title="Light / dark"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
+        <button className={`iconbtn ${menu ? 'on' : ''}`} onClick={() => setMenu((v) => !v)} aria-label="More" aria-expanded={menu} aria-haspopup="menu" title="More"><Icon name="more" /></button>
+        <div className={`overflowmenu ${menu ? 'open' : ''}`} role="menu" onClick={() => setMenu(false)}>
+          {canRecent && <RecentActionsButton className="menuitem">My recent actions</RecentActionsButton>}
+          <NavLink className="menuitem" to="/account"><Icon name="user" />My account</NavLink>
+          <SignOutButton className="menuitem" label="Sign out" title="Sign out"><Icon name="out" />Sign out</SignOutButton>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
       {role !== 'member' && <SearchButton />}
@@ -122,6 +160,34 @@ function TopBar() {
       <div className="grow" />
       <HeaderActions />
     </header>
+  );
+}
+
+/** Bottom tabs on phones. With more than five sections the first four show and the rest sit under "More". */
+function SectionTabs({ items }: { items: Item[] }) {
+  const loc = useLocation();
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setOpen(false); }, [loc.pathname]);
+  const split = items.length > 5;
+  const shown = split ? items.slice(0, 4) : items;
+  const rest = split ? items.slice(4) : [];
+  const inRest = rest.some((i) => (i.end ? loc.pathname === i.to : loc.pathname.startsWith(i.to)));
+  const tab = (i: Item) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')}><Icon name={i.icon} size={22} />{i.label.split(' ')[0]!.replace(/,$/, '')}</NavLink>;
+  return (
+    <nav className="bottomnav sectiontabs" aria-label="Sections">
+      {shown.map(tab)}
+      {split && (
+        <>
+          <button className={inRest || open ? 'active' : ''} onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu"><Icon name="more" size={22} />More</button>
+          <div className={`moresheet ${open ? 'open' : ''}`}>
+            <div className="moreback" onClick={() => setOpen(false)} />
+            <div className="morepanel" role="menu">
+              {rest.map((i) => <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `menuitem ${isActive ? 'active' : ''}`}><Icon name={i.icon} size={20} />{i.label}</NavLink>)}
+            </div>
+          </div>
+        </>
+      )}
+    </nav>
   );
 }
 
@@ -190,13 +256,7 @@ export function Shell() {
         <AnimatedOutlet />
       </div>
       <OfflineBar onDone={done} /><SearchHost pages={pagesFor(role)} />
-      {items && (
-        <nav className="bottomnav" aria-label="Sections" style={{ overflowX: 'auto', justifyContent: 'flex-start' }}>
-          {items.map((i) => (
-            <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => (isActive ? 'active' : '')} style={{ minWidth: 84, fontSize: 11, textAlign: 'center' }}><Icon name={i.icon} size={20} />{i.label.split(' ')[0]}</NavLink>
-          ))}
-        </nav>
-      )}
+      {items && <SectionTabs items={items} />}
     </div>
   );
 }

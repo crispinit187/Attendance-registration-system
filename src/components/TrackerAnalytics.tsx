@@ -60,12 +60,12 @@ export function TrackerAnalytics({ eventId, listId = null }: { eventId: string; 
         <h2 style={{ margin: 0 }}>Summary and analytics</h2>
         <div className="row">
           {!listId && allLists.length > 1 && (
-            <select className="input" style={{ width: 'auto' }} value={list ?? ''} onChange={(e) => setList(e.target.value || null)} aria-label="List">
+            <select className="input" style={{ width: 'auto', maxWidth: '100%' }} value={list ?? ''} onChange={(e) => setList(e.target.value || null)} aria-label="List">
               <option value="">All lists</option>
               {allLists.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
             </select>
           )}
-          <select className="input" style={{ width: 'auto' }} value={date ?? ''} onChange={(e) => setDate(e.target.value || null)} aria-label="Date">
+          <select className="input" style={{ width: 'auto', maxWidth: '100%' }} value={date ?? ''} onChange={(e) => setDate(e.target.value || null)} aria-label="Date">
             <option value="">Any date (cumulative)</option>
             {dates.map((d) => <option key={d.on_date} value={d.on_date}>{fmtD(d.on_date)}{d.title ? ` · ${d.title}` : ''}</option>)}
           </select>
